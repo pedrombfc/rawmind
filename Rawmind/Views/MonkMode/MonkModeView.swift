@@ -29,6 +29,7 @@ struct MonkModeView: View {
         }
         .fullScreenCover(isPresented: $showStart) {
             MonkStartFlow()
+                .trackedModal()
         }
     }
 }

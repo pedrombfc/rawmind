@@ -56,6 +56,7 @@ struct ScreenTimeCard: View {
         .card(padding: 18, radius: 20)
         .sheet(item: $form) { mode in
             NavigationStack { ScreenTimeForm(isBaseline: mode == .baseline) }
+                .trackedModal()
         }
     }
 

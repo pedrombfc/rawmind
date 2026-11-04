@@ -39,6 +39,10 @@ final class Store {
     private let storageKey = "rawmind.data.v1"
     /// Modo de demonstração (só no simulador): nada é salvo nem agendado.
     private var isDemo = false
+    /// Conquistas novas esperando a tela de comemoração (ids).
+    var celebrations: [String] = []
+    /// Quantas folhas (sheets) estão abertas agora. A comemoração espera elas fecharem.
+    var openModals = 0
 
     init() {
         if let raw = UserDefaults.standard.data(forKey: storageKey),
@@ -52,12 +56,20 @@ final class Store {
             seedDemo(mode)
         }
         #endif
+        refreshAchievements()
+        save()
+        #if DEBUG
+        if let id = UserDefaults.standard.string(forKey: "demoCelebrate"), Achievement.find(id) != nil {
+            celebrations = [id]
+        }
+        #endif
     }
 
     // MARK: Gravar
 
     func update(_ change: (inout AppData) -> Void) {
         change(&data)
+        refreshAchievements()
         save()
     }
 
@@ -260,7 +272,8 @@ final class Store {
         update { d in
             d.monk = finished
             if completed {
-                d.monkHistory.append(MonkAttempt(startDate: finished.startDate, daysCompleted: Store.monkDays, end: .completed))
+                d.monkHistory.append(MonkAttempt(startDate: finished.startDate, daysCompleted: Store.monkDays, end: .completed,
+                                                 usedSecondChance: !finished.forgivenDays.isEmpty))
             }
         }
         refreshMonkReminders()
@@ -437,6 +450,29 @@ final class Store {
     }
 
     var canAddHabit: Bool { !monkActive && data.habits.count < Store.maxHabits }
+
+    // MARK: Conquistas
+
+    /// Confere as conquistas e guarda as novas. Na primeira vez, guarda sem festa.
+    func refreshAchievements() {
+        let stats = achievementStats
+        let silent = !data.achievementsSeeded
+        for a in Achievement.all {
+            let earned = a.timesEarned(stats)
+            guard earned > 0 else { continue }
+            let old = data.achievements[a.id]
+            let isNew = old == nil || (a.renews && earned > (old?.times ?? 0))
+            guard isNew else { continue }
+            data.achievements[a.id] = AchievementRecord(date: Date(), times: earned)
+            if !silent && !celebrations.contains(a.id) { celebrations.append(a.id) }
+        }
+        if silent { data.achievementsSeeded = true }
+    }
+
+    /// Fecha a comemoração que está aberta (e passa para a próxima, se tiver).
+    func finishCelebration() {
+        if !celebrations.isEmpty { celebrations.removeFirst() }
+    }
 
     // MARK: Trocas (mente)
 
@@ -681,7 +717,7 @@ final class Store {
                 session(.meditar, daysAgo: 1, minutes: 10),
                 session(.ler, daysAgo: 2, pages: 30, book: "O Poder do Hábito"),
                 session(.respirar, daysAgo: 2, minutes: 2),
-                session(.ler, daysAgo: 3, pages: 45, book: "Hábitos Atômicos", finished: true),
+                session(.ler, daysAgo: 3, pages: 58, book: "Hábitos Atômicos", finished: true),
             ]
             func task(_ id: String, daysAgo: Int, minutes: Int = 0) -> MindSession {
                 var m = MindSession(kind: .outro, seconds: minutes * 60, title: Activity.find(id)?.title ?? id, activity: id)

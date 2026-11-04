@@ -46,13 +46,16 @@ struct TodayView: View {
         }
         .sheet(isPresented: $showFocus) {
             FocusView()
+                .trackedModal()
         }
         .sheet(isPresented: $showOther) {
             NavigationStack { OtherSwapView() }
                 .presentationDetents([.medium, .large])
+                .trackedModal()
         }
         .sheet(item: $screenForm) { mode in
             NavigationStack { ScreenTimeForm(isBaseline: mode == .baseline) }
+                .trackedModal()
         }
     }
 

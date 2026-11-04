@@ -86,6 +86,7 @@ struct RoutineView: View {
         }
         .sheet(isPresented: $editing) {
             NavigationStack { RoutineEditor() }
+                .trackedModal()
         }
     }
 

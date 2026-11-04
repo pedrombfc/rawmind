@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Progresso: o seu mês, tempo de tela antes x agora, trocas da semana e caderno.
+/// Progresso: conquistas, tempo de tela antes x agora, trocas da semana e caderno.
 struct ProgressScreen: View {
     @Environment(Store.self) private var store
 
@@ -13,7 +13,7 @@ struct ProgressScreen: View {
                         .tracking(-0.6)
                         .padding(.bottom, 4)
 
-                    monthCard
+                    AchievementsCard()
 
                     ScreenTimeCard()
 
@@ -52,51 +52,6 @@ struct ProgressScreen: View {
         }
     }
 
-    // MARK: Seu mês
-
-    private var monthCard: some View {
-        let month = store.mindThisMonth
-        let monthName = PTDate.months[(Calendar.current.component(.month, from: Date()) - 1) % 12]
-        let books = store.booksFinished(in: month)
-        return VStack(alignment: .leading, spacing: 14) {
-            SectionLabel(text: "Seu mês · \(monthName)", color: Theme.accent)
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("\(month.count)").font(.archivo(44))
-                Text(month.count == 1 ? "troca em vez do celular" : "trocas em vez do celular")
-                    .font(.inter(15))
-                    .foregroundStyle(Theme.muted)
-            }
-            VStack(spacing: 10) {
-                HStack(spacing: 10) {
-                    tile("\(store.pagesRead(in: month))", "páginas lidas")
-                    tile("\(books)", books == 1 ? "livro terminado" : "livros terminados")
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 10) {
-                    tile("\(store.mindMinutes(.escrever, in: month))", "min escrevendo")
-                    tile("\(store.mindMinutes(.pensar, in: month))", "min pensando")
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 10) {
-                    tile("\(store.mindMinutes(.respirar, in: month))", "min respirando")
-                    tile("\(store.mindMinutes(.meditar, in: month))", "min meditando")
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 10) {
-                    categoryTile(.produtividade, month)
-                    categoryTile(.criatividade, month)
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 10) {
-                    categoryTile(.corpo, month)
-                    categoryTile(.pessoas, month)
-                }
-                .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .card(padding: 18, radius: 20)
-    }
-
     // MARK: Sua mente
 
     private var mindCard: some View {
@@ -113,27 +68,6 @@ struct ProgressScreen: View {
             WeekBars(counts: counts)
         }
         .card(padding: 18, radius: 20)
-    }
-
-    private func categoryTile(_ category: ActivityCategory, _ month: [MindSession]) -> some View {
-        let n = store.activityCount(category, in: month)
-        return tile("\(n)", category.monthLabel(n))
-    }
-
-    private func tile(_ value: String, _ label: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(value).font(.archivo(22, bold: true))
-            Text(label)
-                .font(.inter(12))
-                .foregroundStyle(Theme.muted)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Theme.track, lineWidth: 1)
-        )
     }
 }
 

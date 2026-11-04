@@ -70,5 +70,15 @@ struct MainTabView: View {
         )) {
             MonkFailureView()
         }
+        // Conquista nova: espera as folhas abertas fecharem e o Monk Mode não estar em falha.
+        .fullScreenCover(item: Binding(
+            get: {
+                guard store.openModals == 0, store.data.monk?.failure == nil else { return nil }
+                return store.celebrations.first.map { CelebrationItem(id: $0) }
+            },
+            set: { item in if item == nil { store.finishCelebration() } }
+        )) { item in
+            AchievementUnlockedView(id: item.id)
+        }
     }
 }

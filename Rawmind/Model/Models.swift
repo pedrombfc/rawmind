@@ -191,6 +191,10 @@ struct AppData: Codable {
     var monkHistory: [MonkAttempt] = []
     /// Meses ("aaaa-mm") em que a segunda chance já foi usada.
     var secondChancesUsed: [String] = []
+    /// Conquistas ganhas (chave = id da conquista).
+    var achievements: [String: AchievementRecord] = [:]
+    /// As conquistas que já existiam foram registradas sem festa (primeira vez que o app conferiu).
+    var achievementsSeeded: Bool = false
 
     init() {}
 
@@ -211,6 +215,8 @@ struct AppData: Codable {
         monk = try c.decodeIfPresent(MonkRun.self, forKey: .monk)
         monkHistory = try c.decodeIfPresent([MonkAttempt].self, forKey: .monkHistory) ?? []
         secondChancesUsed = try c.decodeIfPresent([String].self, forKey: .secondChancesUsed) ?? []
+        achievements = try c.decodeIfPresent([String: AchievementRecord].self, forKey: .achievements) ?? [:]
+        achievementsSeeded = try c.decodeIfPresent(Bool.self, forKey: .achievementsSeeded) ?? false
     }
 }
 
@@ -265,11 +271,14 @@ struct MonkAttempt: Codable, Hashable, Identifiable {
     var endDate: Date = Date()
     var daysCompleted: Int
     var end: MonkEnd
+    /// Usou a segunda chance nesta tentativa.
+    var usedSecondChance: Bool = false
 
-    init(startDate: Date, daysCompleted: Int, end: MonkEnd) {
+    init(startDate: Date, daysCompleted: Int, end: MonkEnd, usedSecondChance: Bool = false) {
         self.startDate = startDate
         self.daysCompleted = daysCompleted
         self.end = end
+        self.usedSecondChance = usedSecondChance
     }
 
     init(from decoder: Decoder) throws {
@@ -279,6 +288,7 @@ struct MonkAttempt: Codable, Hashable, Identifiable {
         endDate = try c.decodeIfPresent(Date.self, forKey: .endDate) ?? Date()
         daysCompleted = try c.decodeIfPresent(Int.self, forKey: .daysCompleted) ?? 0
         end = try c.decodeIfPresent(MonkEnd.self, forKey: .end) ?? .failed
+        usedSecondChance = try c.decodeIfPresent(Bool.self, forKey: .usedSecondChance) ?? false
     }
 }
 
