@@ -26,6 +26,7 @@ struct ProgressScreen: View {
                         tile("\(store.mindMinutes(.ler, in: week))", "min lendo")
                         tile("\(week.reduce(0) { $0 + $1.wordCount })", "palavras escritas")
                     }
+                    .fixedSize(horizontal: false, vertical: true)
 
                     NavigationLink {
                         JournalView()
@@ -58,6 +59,7 @@ struct ProgressScreen: View {
             }
             .foregroundStyle(Theme.text)
             .screenBackground()
+            .statusBarCover()
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: MindKind.self) { kind in
                 if kind == .escrever {
@@ -173,7 +175,7 @@ struct ProgressScreen: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Theme.track, lineWidth: 1)

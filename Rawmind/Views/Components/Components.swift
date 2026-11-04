@@ -160,6 +160,15 @@ extension View {
         self.background(Theme.bg.ignoresSafeArea())
     }
 
+    /// Fundo atrás da hora e da bateria, para o conteúdo não aparecer ali ao rolar.
+    func statusBarCover() -> some View {
+        self.overlay(alignment: .top) {
+            Color.clear
+                .frame(height: 0)
+                .background(Theme.bg, ignoresSafeAreaEdges: .top)
+        }
+    }
+
     /// Cartão escuro arredondado.
     func card(padding: CGFloat = 16, radius: CGFloat = 16) -> some View {
         self

@@ -19,6 +19,7 @@ struct MonkModeView: View {
             }
             .foregroundStyle(Theme.text)
             .screenBackground()
+            .statusBarCover()
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: MonkRoute.self) { route in
                 switch route {
@@ -374,6 +375,7 @@ private struct MonkDaysGrid: View {
                 tile("\(max(store.monkRecord, completed))", "seu recorde", Theme.accent)
                 tile("\(store.data.monk?.attempt ?? 1)ª", "tentativa", Theme.text)
             }
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -424,7 +426,7 @@ private struct MonkDaysGrid: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Theme.track, lineWidth: 1)

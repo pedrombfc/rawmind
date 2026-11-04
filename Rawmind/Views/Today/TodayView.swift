@@ -26,6 +26,7 @@ struct TodayView: View {
                 .padding(.bottom, 24)
             }
             .screenBackground()
+            .statusBarCover()
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: String.self) { value in
                 if value == "routine" { RoutineView() }
@@ -297,6 +298,7 @@ struct TodayView: View {
             statTile(value: "\(store.completedDays)", label: store.completedDays == 1 ? "dia com a rotina feita" : "dias com a rotina feita")
             statTile(value: "\(store.swapsToday)", label: store.swapsToday == 1 ? "troca hoje" : "trocas hoje")
         }
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private func statTile(value: String, label: String) -> some View {
@@ -310,7 +312,7 @@ struct TodayView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Theme.track, lineWidth: 1)

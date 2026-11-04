@@ -75,6 +75,8 @@ struct RoutineView: View {
         .screenBackground()
         .foregroundStyle(Theme.text)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Theme.bg, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Editar rotina") { editing = true }
@@ -122,6 +124,7 @@ struct RoutineView: View {
                 tile("\(store.reservesLeftThisWeek)", "reservas nesta semana")
                 tile("\(store.totalFocusMinutes)", "min de foco")
             }
+            .fixedSize(horizontal: false, vertical: true)
 
             Text("Essa sequência nunca zera. Errar um dia não apaga o que você já fez: o que conta é voltar.")
                 .font(.inter(14))
@@ -147,7 +150,7 @@ struct RoutineView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Theme.track, lineWidth: 1)

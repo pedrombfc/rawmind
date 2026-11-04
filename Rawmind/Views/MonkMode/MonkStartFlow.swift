@@ -43,6 +43,7 @@ struct MonkStartFlow: View {
         }
         .foregroundStyle(Theme.text)
         .screenBackground()
+        .statusBarCover()
         .animation(.easeInOut(duration: 0.25), value: step)
         .sheet(isPresented: $showNew) {
             NavigationStack {
@@ -243,6 +244,7 @@ struct MonkFailureView: View {
         }
         .foregroundStyle(Theme.text)
         .screenBackground()
+        .statusBarCover()
         .interactiveDismissDisabled()
     }
 

@@ -59,6 +59,7 @@ struct OnboardingView: View {
             }
         }
         .screenBackground()
+        .statusBarCover()
         .foregroundStyle(Theme.text)
         .animation(.easeInOut(duration: 0.25), value: step)
     }
