@@ -170,14 +170,6 @@ struct MindExerciseView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(running)
         .toolbarBackground(Theme.bg, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Terminei antes") { finish() }
-                    .foregroundStyle(Theme.muted)
-                    .opacity(running ? 1 : 0)
-                    .disabled(!running)
-            }
-        }
         .scrollDismissesKeyboard(.interactively)
     }
 
@@ -281,7 +273,10 @@ struct MindExerciseView: View {
             }
             .buttonStyle(PrimaryButtonStyle())
         } else if running {
-            Color.clear.frame(height: 56)
+            Button("Terminei antes") { finish() }
+                .font(.inter(16, .medium))
+                .foregroundStyle(Theme.muted)
+                .frame(height: 56)
         } else {
             Button("Começar") {
                 let now = Date()
