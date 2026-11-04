@@ -598,10 +598,15 @@ final class Store {
     }
 
     #if DEBUG
-    /// Para tirar prints no simulador: abrir o app com `-demoMonk ativo`, `falha` ou `fim`.
+    /// Para tirar prints no simulador: abrir o app com `-demoMonk ativo`, `falha`, `fim` ou `onboarding`.
     /// Usa dados de exemplo só na memória; os dados reais do celular não mudam.
     private func seedDemo(_ mode: String) {
         isDemo = true
+        if mode == "onboarding" {
+            // Onboarding do zero, sem apagar os dados reais.
+            data = AppData()
+            return
+        }
         let today = calendar.startOfDay(for: Date())
         let titles = ["Treinar", "Ler 10 páginas", "Beber 2L de água", "Sem redes antes do meio-dia", "Dormir antes da meia-noite"]
         var habits = titles.compactMap { t in Library.habits.first { $0.title == t } }
