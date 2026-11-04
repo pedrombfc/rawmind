@@ -47,12 +47,15 @@ struct MainTabView: View {
             MonkModeView()
                 .tabItem { Label("Monk Mode", systemImage: "flame") }
                 .tag(1)
+            GuidesView()
+                .tabItem { Label("Guias", systemImage: "book") }
+                .tag(2)
             ProgressScreen()
                 .tabItem { Label("Progresso", systemImage: "chart.bar") }
-                .tag(2)
+                .tag(3)
             SettingsView()
                 .tabItem { Label("Ajustes", systemImage: "slider.horizontal.3") }
-                .tag(3)
+                .tag(4)
         }
         .toolbarBackground(Theme.bg, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
