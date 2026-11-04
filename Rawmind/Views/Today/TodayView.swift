@@ -210,13 +210,15 @@ struct TodayView: View {
                 .font(.archivo(24, bold: true))
                 .padding(.top, 8)
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
+                HStack(spacing: 10) {
                     ForEach(MindKind.activities) { kind in
                         activityCard(kind)
                     }
                 }
-                .padding(.horizontal, 20)
+                .scrollTargetLayout()
             }
+            .scrollTargetBehavior(.viewAligned)
+            .safeAreaPadding(.horizontal, 20)
             .padding(.horizontal, -20)
         }
     }
@@ -232,29 +234,29 @@ struct TodayView: View {
         } label: {
             VStack(alignment: .leading, spacing: 0) {
                 Image(systemName: kind.icon)
-                    .font(.system(size: 25, weight: .medium))
+                    .font(.system(size: 21, weight: .medium))
                     .foregroundStyle(Theme.text)
-                    .frame(height: 30, alignment: .leading)
-                Spacer(minLength: 8)
+                    .frame(height: 24, alignment: .leading)
+                Spacer(minLength: 6)
                 Text(kind.shortTitle)
-                    .font(.inter(17, .semibold))
+                    .font(.inter(16, .semibold))
                     .foregroundStyle(Theme.text)
                 Text(subtitle)
-                    .font(.inter(14))
+                    .font(.inter(13))
                     .foregroundStyle(doneToday ? Theme.done : Theme.muted)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-                    .padding(.top, 2)
+                    .minimumScaleFactor(0.8)
+                    .padding(.top, 1)
             }
-            .padding(16)
-            .frame(width: 180, height: 118, alignment: .leading)
+            .padding(14)
+            .frame(width: 148, height: 100, alignment: .leading)
             .background(Theme.card)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .strokeBorder(Theme.track, lineWidth: 1)
             )
-            .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         }
         .buttonStyle(.plain)
     }
