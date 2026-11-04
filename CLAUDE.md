@@ -118,7 +118,7 @@ Depois dos prints, abra o app de novo sem argumentos para voltar aos dados reais
 
 ## Git
 
-Esta pasta é um clone de `github.com/pedrombfc/rawmind` (branch `main`). O GitHub serve só de cópia: a pasta do Mac é a fonte. Faça um commit por rodada, com mensagem clara. Dar push para `main` é opcional, mas mantém a cópia em dia.
+A pasta do Mac (`~/Desktop/Rawmind`) **não** é um repositório git: ela é a fonte. Existe uma cópia em `github.com/pedrombfc/rawmind` (branch `main`) que só servia para levar arquivos até a pasta. Ela não é atualizada sozinha e pode ficar para trás. Não crie repositório nem dê push sem o Pedro pedir.
 
 ## O que falta
 
