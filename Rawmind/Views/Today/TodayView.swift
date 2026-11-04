@@ -14,9 +14,6 @@ struct TodayView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     header
-                    if store.monkActive {
-                        ThinBar(value: Double(min(store.monkDay, Store.monkDays)) / Double(Store.monkDays))
-                    }
                     routineCard
                     swapCard
                     habitsSection
@@ -86,10 +83,12 @@ struct TodayView: View {
                         compareTile("Instagram", before: base.instagramMinutes, now: now.instagramMinutes)
                         if saved > 0 {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Por semana")
+                                Text("Livres por semana")
                                     .font(.inter(12))
                                     .foregroundStyle(Theme.muted)
-                                Text("+\(Store.durationText(saved * 7))")
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                                Text(Store.durationText(saved * 7))
                                     .font(.inter(15, .semibold))
                                     .foregroundStyle(Theme.done)
                                     .lineLimit(1)
