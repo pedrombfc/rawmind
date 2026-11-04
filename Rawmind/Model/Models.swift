@@ -289,8 +289,6 @@ enum MindKind: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
 
     static let exercises: [MindKind] = [.pensar, .escrever, .ler, .respirar, .meditar]
-    /// Cartões "Em vez do celular" na tela Hoje.
-    static let activities: [MindKind] = [.ler, .escrever, .pensar, .respirar, .meditar, .outro]
 
     /// Nome curto para os cartões.
     var shortTitle: String { self == .pensar ? "Pensar" : title }
@@ -363,14 +361,17 @@ struct MindSession: Codable, Identifiable, Hashable {
     var pages: Int = 0
     /// Terminou o livro nesta leitura.
     var finishedBook: Bool = false
+    /// Tarefa do catálogo (ex.: "alongar"), quando não é uma das telas de mente.
+    var activity: String = ""
 
-    init(kind: MindKind, seconds: Int = 0, text: String = "", title: String = "", pages: Int = 0, finishedBook: Bool = false) {
+    init(kind: MindKind, seconds: Int = 0, text: String = "", title: String = "", pages: Int = 0, finishedBook: Bool = false, activity: String = "") {
         self.kind = kind
         self.seconds = seconds
         self.text = text
         self.title = title
         self.pages = pages
         self.finishedBook = finishedBook
+        self.activity = activity
     }
 
     init(from decoder: Decoder) throws {
@@ -383,6 +384,7 @@ struct MindSession: Codable, Identifiable, Hashable {
         title = try c.decodeIfPresent(String.self, forKey: .title) ?? ""
         pages = try c.decodeIfPresent(Int.self, forKey: .pages) ?? 0
         finishedBook = try c.decodeIfPresent(Bool.self, forKey: .finishedBook) ?? false
+        activity = try c.decodeIfPresent(String.self, forKey: .activity) ?? ""
     }
 
     var wordCount: Int {

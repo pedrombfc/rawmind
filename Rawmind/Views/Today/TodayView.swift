@@ -1,8 +1,8 @@
 import SwiftUI
 import UIKit
 
-/// Tela "Hoje": tempo de tela ganho, rotina matinal, cartão do Monk Mode,
-/// atividades "em vez do celular" e foco.
+/// Tela "Hoje": tempo de tela ganho, rotina matinal, cartão do Monk Mode
+/// e tarefas "em vez do celular" por seção. Foco no cadeado do canto.
 struct TodayView: View {
     @Environment(Store.self) private var store
     var openMonk: () -> Void = {}
@@ -14,14 +14,11 @@ struct TodayView: View {
     var body: some View {
         NavigationStack(path: $path) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 24) {
                     header
                     routineCard
                     monkCard
                     activitiesSection
-                    statsRow
-                    focusButton
-                        .padding(.top, 8)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
@@ -39,6 +36,12 @@ struct TodayView: View {
                 case .escrever: WriteView(onDone: { path = NavigationPath() })
                 default: MindExerciseView(kind: kind, onDone: { path = NavigationPath() })
                 }
+            }
+            .navigationDestination(for: Activity.self) { activity in
+                ActivityTaskView(activity: activity, onDone: { path = NavigationPath() })
+            }
+            .navigationDestination(for: ActivityCategory.self) { category in
+                ActivityCategoryView(category: category)
             }
         }
         .sheet(isPresented: $showFocus) {
@@ -58,20 +61,12 @@ struct TodayView: View {
     /// Topo: data e quanto tempo de celular por dia você cortou desde antes do Rawmind.
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .center) {
                 Text(PTDate.long(Date()))
                     .font(.inter(14))
                     .foregroundStyle(Theme.muted)
                 Spacer(minLength: 8)
-                if store.needsScreenUpdate {
-                    Button { screenForm = .week } label: {
-                        Text("Anotar esta semana →")
-                            .font(.inter(14, .semibold))
-                            .foregroundStyle(Theme.accent)
-                            .lineLimit(1)
-                    }
-                    .buttonStyle(.plain)
-                }
+                lockButton
             }
 
             if let base = store.data.screenBaseline {
@@ -112,6 +107,7 @@ struct TodayView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
                     }
+                    weekUpdateLink
                 } else {
                     VStack(alignment: .leading, spacing: 2) {
                         bigNumber(Store.durationText(base.totalMinutes), color: Theme.text)
@@ -123,6 +119,7 @@ struct TodayView: View {
                             .foregroundStyle(Theme.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    weekUpdateLink
                 }
             } else {
                 VStack(alignment: .leading, spacing: 8) {
@@ -138,6 +135,35 @@ struct TodayView: View {
                     .buttonStyle(.plain)
                 }
             }
+        }
+    }
+
+    /// Sessão de foco (Lock in), no canto de cima.
+    private var lockButton: some View {
+        Button {
+            showFocus = true
+        } label: {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(Theme.bg)
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(Theme.accent))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Lock in: sessão de foco")
+    }
+
+    @ViewBuilder
+    private var weekUpdateLink: some View {
+        if store.needsScreenUpdate {
+            Button { screenForm = .week } label: {
+                Text("Anotar o tempo de tela desta semana →")
+                    .font(.inter(14, .semibold))
+                    .foregroundStyle(Theme.accent)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 2)
         }
     }
 
@@ -205,14 +231,40 @@ struct TodayView: View {
     // MARK: Em vez do celular
 
     private var activitiesSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 24) {
             Text("Em vez do celular")
-                .font(.archivo(24, bold: true))
-                .padding(.top, 8)
+                .font(.archivo(28, bold: true))
+                .tracking(-0.5)
+                .padding(.top, 4)
+            ForEach(ActivityCategory.allCases) { category in
+                categoryRow(category)
+            }
+            otherButton
+        }
+    }
+
+    private func categoryRow(_ category: ActivityCategory) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            NavigationLink(value: category) {
+                HStack(spacing: 6) {
+                    Text(category.title)
+                        .font(.archivo(20, bold: true))
+                        .foregroundStyle(Theme.text)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(Theme.muted)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Abre a lista completa")
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
-                    ForEach(MindKind.activities) { kind in
-                        activityCard(kind)
+                    ForEach(category.activities) { activity in
+                        ActivityLink(activity: activity) {
+                            ActivityCard(activity: activity)
+                        }
                     }
                 }
                 .scrollTargetLayout()
@@ -223,65 +275,33 @@ struct TodayView: View {
         }
     }
 
-    private func activityCard(_ kind: MindKind) -> some View {
-        let (subtitle, doneToday) = activitySubtitle(kind)
-        return Button {
-            if kind == .outro {
-                showOther = true
-            } else {
-                path.append(kind)
+    /// "Outra coisa": anotar algo que não está nas listas.
+    private var otherButton: some View {
+        Button { showOther = true } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "plus")
+                    .font(.system(size: 16, weight: .bold))
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(Theme.track))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Fiz outra coisa")
+                        .font(.inter(16, .semibold))
+                    Text("Anote o que você fez em vez do celular")
+                        .font(.inter(13))
+                        .foregroundStyle(Theme.muted)
+                }
+                Spacer(minLength: 0)
             }
-        } label: {
-            VStack(alignment: .leading, spacing: 0) {
-                Image(systemName: kind.icon)
-                    .font(.system(size: 21, weight: .medium))
-                    .foregroundStyle(Theme.text)
-                    .frame(height: 24, alignment: .leading)
-                Spacer(minLength: 6)
-                Text(kind.shortTitle)
-                    .font(.inter(16, .semibold))
-                    .foregroundStyle(Theme.text)
-                Text(subtitle)
-                    .font(.inter(13))
-                    .foregroundStyle(doneToday ? Theme.done : Theme.muted)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .padding(.top, 1)
-            }
+            .foregroundStyle(Theme.text)
             .padding(14)
-            .frame(width: 148, height: 100, alignment: .leading)
-            .background(Theme.card)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .frame(maxWidth: .infinity, alignment: .leading)
             .overlay(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .strokeBorder(Theme.track, lineWidth: 1)
             )
-            .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
         .buttonStyle(.plain)
-    }
-
-    /// Subtítulo do cartão: o que já fez hoje (verde) ou a duração sugerida.
-    private func activitySubtitle(_ kind: MindKind) -> (String, Bool) {
-        let today = store.mindSessions(on: Date()).filter { $0.kind == kind }
-        if !today.isEmpty {
-            switch kind {
-            case .ler:
-                let p = store.pagesRead(in: today)
-                return (p == 1 ? "1 página hoje" : "\(p) páginas hoje", true)
-            case .outro:
-                return ("\(today.count)x hoje", true)
-            default:
-                let m = store.mindMinutes(kind, in: today)
-                return (m > 0 ? "\(m) min hoje" : "\(today.count)x hoje", true)
-            }
-        }
-        switch kind {
-        case .ler: return ("Registrar páginas", false)
-        case .pensar: return ("\(kind.defaultMinutes) min, sem tela", false)
-        case .outro: return ("Registrar o que fez", false)
-        default: return ("\(kind.defaultMinutes) min", false)
-        }
     }
 
     private var routineSubtitle: String {
@@ -350,51 +370,6 @@ struct TodayView: View {
         }
         if store.monkCompleted { return "30 dias feitos. Escreva o que mudou." }
         return "\(Store.monkDays) dias, \(Store.minHabits) hábitos ou mais, sem desculpa."
-    }
-
-    private var statsRow: some View {
-        HStack(spacing: 10) {
-            statTile(value: "\(store.completedDays)", label: store.completedDays == 1 ? "dia com a rotina feita" : "dias com a rotina feita")
-            statTile(value: "\(store.swapsToday)", label: store.swapsToday == 1 ? "troca hoje" : "trocas hoje")
-        }
-        .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private func statTile(value: String, label: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(value)
-                .font(.archivo(22, bold: true))
-            Text(label)
-                .font(.inter(13))
-                .foregroundStyle(Theme.muted)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Theme.track, lineWidth: 1)
-        )
-    }
-
-    private var focusButton: some View {
-        Button {
-            showFocus = true
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "lock")
-                    .font(.system(size: 18, weight: .bold))
-                Text("Lock in · sessão de foco")
-            }
-            .font(.archivo(20))
-            .foregroundStyle(Theme.bg)
-            .frame(maxWidth: .infinity)
-            .frame(height: 60)
-            .background(Theme.accent)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        }
-        .buttonStyle(.plain)
     }
 }
 

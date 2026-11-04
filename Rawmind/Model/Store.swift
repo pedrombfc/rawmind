@@ -683,6 +683,18 @@ final class Store {
                 session(.respirar, daysAgo: 2, minutes: 2),
                 session(.ler, daysAgo: 3, pages: 45, book: "Hábitos Atômicos", finished: true),
             ]
+            func task(_ id: String, daysAgo: Int, minutes: Int = 0) -> MindSession {
+                var m = MindSession(kind: .outro, seconds: minutes * 60, title: Activity.find(id)?.title ?? id, activity: id)
+                m.date = calendar.date(byAdding: .day, value: -daysAgo, to: Date()) ?? Date()
+                return m
+            }
+            d.mindSessions += [
+                task("alongar", daysAgo: 0),
+                task("foco", daysAgo: 0, minutes: 25),
+                task("caminhar", daysAgo: 1, minutes: 15),
+                task("desenhar", daysAgo: 2, minutes: 10),
+                task("familia", daysAgo: 3),
+            ]
         }
         // Tempo de tela de exemplo: 4h10 antes, 2h30 na última semana anotada.
         var base = ScreenTimeEntry(totalMinutes: 250, instagramMinutes: 75)

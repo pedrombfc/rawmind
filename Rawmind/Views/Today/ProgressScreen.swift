@@ -82,6 +82,16 @@ struct ProgressScreen: View {
                     tile("\(store.mindMinutes(.meditar, in: month))", "min meditando")
                 }
                 .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 10) {
+                    categoryTile(.produtividade, month)
+                    categoryTile(.criatividade, month)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 10) {
+                    categoryTile(.corpo, month)
+                    categoryTile(.pessoas, month)
+                }
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
         .card(padding: 18, radius: 20)
@@ -103,6 +113,11 @@ struct ProgressScreen: View {
             WeekBars(counts: counts)
         }
         .card(padding: 18, radius: 20)
+    }
+
+    private func categoryTile(_ category: ActivityCategory, _ month: [MindSession]) -> some View {
+        let n = store.activityCount(category, in: month)
+        return tile("\(n)", (n == 1 ? "tarefa " : "tarefas ") + category.monthLabel)
     }
 
     private func tile(_ value: String, _ label: String) -> some View {
