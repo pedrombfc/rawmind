@@ -59,6 +59,8 @@ final class Store {
         refreshAchievements()
         save()
         #if DEBUG
+        // No modo demo, as conquistas do exemplo não abrem a tela de comemoração uma por uma.
+        if isDemo { celebrations = [] }
         if let id = UserDefaults.standard.string(forKey: "demoCelebrate"), Achievement.find(id) != nil {
             celebrations = [id]
         }
