@@ -16,11 +16,18 @@ struct RoutineEditor: View {
                             Text(item.why).font(.inter(13)).foregroundStyle(Theme.muted)
                         }
                     }
-                    .deleteDisabled(store.data.routine.count <= 1)
-                }
-                .onDelete { offsets in
-                    store.update { $0.routine.remove(atOffsets: offsets) }
-                    store.refreshTodayCompletion()
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        if store.data.routine.count > 1 {
+                            Button(role: .destructive) {
+                                let id = item.id
+                                store.update { d in d.routine.removeAll { $0.id == id } }
+                                store.refreshTodayCompletion()
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .accessibilityLabel("Apagar")
+                        }
+                    }
                 }
                 .onMove { from, to in
                     store.update { $0.routine.move(fromOffsets: from, toOffset: to) }

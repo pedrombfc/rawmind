@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Criar ou editar um hábito do Monk Mode.
+/// Criar ou editar um hábito do Monk Mode. Todo hábito é diário, durante os 30 dias.
 struct HabitFormView: View {
     @Environment(Store.self) private var store
     @Environment(\.dismiss) private var dismiss
@@ -9,25 +9,43 @@ struct HabitFormView: View {
     @State private var title = ""
     @State private var why = ""
     @State private var avoid = false
-    @State private var perWeek = 7
-    @State private var period: DayPeriod = .qualquer
-    @State private var reminderOn = false
-    @State private var reminderTime = Calendar.current.date(bySettingHour: 18, minute: 0, second: 0, of: Date()) ?? Date()
+    @State private var icon = "flame"
+    @State private var reminders: [HabitReminder] = []
+    @State private var showIcons = false
     @State private var loaded = false
 
     var body: some View {
         Form {
-            if existing == nil {
-                Section("Sugestões") {
-                    FlowLayout(spacing: 8) {
-                        ForEach(suggestions) { s in
-                            Chip(label: s.title, selected: title == s.title) { apply(s) }
+            Section {
+                VStack(spacing: 10) {
+                    Button {
+                        showIcons = true
+                    } label: {
+                        ZStack(alignment: .bottomTrailing) {
+                            Image(systemName: icon)
+                                .font(.system(size: 44, weight: .regular))
+                                .foregroundStyle(Theme.text)
+                                .frame(width: 112, height: 112)
+                                .background(Circle().fill(Theme.card))
+                                .overlay(Circle().strokeBorder(Theme.track, lineWidth: 2))
+                            Image(systemName: "pencil")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(Theme.bg)
+                                .frame(width: 36, height: 36)
+                                .background(Circle().fill(Theme.accent))
+                                .overlay(Circle().strokeBorder(Theme.bg, lineWidth: 3))
+                                .offset(x: 2, y: -2)
                         }
                     }
-                    .padding(.vertical, 6)
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Escolher ícone")
+                    Text("Toque para escolher o ícone")
+                        .font(.inter(14))
+                        .foregroundStyle(Theme.muted)
                 }
-                .listRowBackground(Theme.card)
+                .frame(maxWidth: .infinity)
             }
+            .listRowBackground(Color.clear)
 
             Section {
                 Picker("Tipo", selection: $avoid) {
@@ -39,44 +57,64 @@ struct HabitFormView: View {
             } header: {
                 Text("Nome")
             } footer: {
-                Text(avoid
-                     ? "Hábitos de evitar você confirma à noite: \"hoje eu me mantive\"."
-                     : "Algo pequeno e claro, que dá pra marcar como feito.")
+                VStack(alignment: .leading, spacing: 10) {
+                    if existing == nil && !suggestions.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(suggestions) { s in
+                                    Button { apply(s) } label: {
+                                        Text(s.title)
+                                            .font(.inter(14, title == s.title ? .semibold : .regular))
+                                            .foregroundStyle(title == s.title ? Theme.bg : Theme.text)
+                                            .padding(.horizontal, 13)
+                                            .frame(height: 34)
+                                            .background(Capsule().fill(title == s.title ? Theme.accent : Color.clear))
+                                            .overlay(Capsule().strokeBorder(title == s.title ? Theme.accent : Theme.chipBorder, lineWidth: 1))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+                    Text(avoid
+                         ? "Todo dia, durante os 30 dias do Monk Mode. À noite você confirma: \"hoje eu me mantive\"."
+                         : "Todo dia, durante os 30 dias do Monk Mode.")
+                }
+                .padding(.top, 4)
+            }
+            .listRowBackground(Theme.card)
+
+            Section("O que você espera que mude?") {
+                TextField("Ex.: Dormir melhor e ter mais energia", text: $why, axis: .vertical)
+                    .lineLimit(2...4)
             }
             .listRowBackground(Theme.card)
 
             Section {
-                TextField("Ex.: Dormir melhor e ter mais energia", text: $why, axis: .vertical)
-                    .lineLimit(2...4)
-            } header: {
-                Text("O que você espera que mude?")
-            } footer: {
-                Text("No dia 30 você volta aqui e compara.")
-            }
-            .listRowBackground(Theme.card)
-
-            Section("Detalhes") {
-                if !avoid {
-                    Picker("Frequência", selection: $perWeek) {
-                        Text("Todo dia").tag(7)
-                        ForEach([6, 5, 4, 3, 2], id: \.self) { n in
-                            Text("\(n)x por semana").tag(n)
+                ForEach($reminders) { $r in
+                    DatePicker(reminderLabel(r), selection: timeBinding($r), displayedComponents: .hourAndMinute)
+                        .environment(\.locale, Locale(identifier: "pt_BR"))
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                reminders.removeAll { $0.id == r.id }
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .accessibilityLabel("Apagar lembrete")
                         }
+                }
+                if reminders.count < 2 {
+                    Button {
+                        let hour = reminders.isEmpty ? 8 : 21
+                        reminders.append(HabitReminder(hour: hour, minute: 0))
+                    } label: {
+                        Label("Adicionar lembrete", systemImage: "bell.badge")
                     }
                 }
-                Picker("Quando", selection: $period) {
-                    ForEach(DayPeriod.allCases) { p in Text(p.rawValue).tag(p) }
-                }
-                HStack {
-                    Text("Duração")
-                    Spacer()
-                    Text("30 dias · Monk Mode").foregroundStyle(Theme.muted)
-                }
-                Toggle("Lembrete", isOn: $reminderOn)
-                if reminderOn {
-                    DatePicker("Horário", selection: $reminderTime, displayedComponents: .hourAndMinute)
-                        .environment(\.locale, Locale(identifier: "pt_BR"))
-                }
+            } header: {
+                Text("Lembretes")
+            } footer: {
+                Text("Até 2 lembretes por hábito. Deslize para apagar.")
             }
             .listRowBackground(Theme.card)
         }
@@ -95,6 +133,10 @@ struct HabitFormView: View {
                     .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
+        .sheet(isPresented: $showIcons) {
+            IconPicker(selected: $icon)
+                .presentationDetents([.medium, .large])
+        }
         .onAppear(perform: load)
     }
 
@@ -102,12 +144,29 @@ struct HabitFormView: View {
         Library.habits.filter { s in !store.data.habits.contains { $0.title == s.title } }
     }
 
+    private func reminderLabel(_ r: HabitReminder) -> String {
+        let i = (reminders.firstIndex { $0.id == r.id } ?? 0) + 1
+        return "Lembrete \(i)"
+    }
+
+    private func timeBinding(_ r: Binding<HabitReminder>) -> Binding<Date> {
+        Binding(
+            get: {
+                Calendar.current.date(bySettingHour: r.wrappedValue.hour, minute: r.wrappedValue.minute, second: 0, of: Date()) ?? Date()
+            },
+            set: { newValue in
+                let c = Calendar.current.dateComponents([.hour, .minute], from: newValue)
+                r.wrappedValue.hour = c.hour ?? 8
+                r.wrappedValue.minute = c.minute ?? 0
+            }
+        )
+    }
+
     private func apply(_ s: Habit) {
         title = s.title
         why = s.why
         avoid = s.avoid
-        period = s.period
-        perWeek = s.perWeek
+        icon = s.icon
     }
 
     private func load() {
@@ -117,29 +176,67 @@ struct HabitFormView: View {
         title = h.title
         why = h.why
         avoid = h.avoid
-        perWeek = h.perWeek
-        period = h.period
-        reminderOn = h.reminderOn
-        reminderTime = Calendar.current.date(bySettingHour: h.reminderHour, minute: h.reminderMinute, second: 0, of: Date()) ?? Date()
+        icon = h.icon
+        reminders = h.reminders
     }
 
     private func save() {
-        var h = existing ?? Habit(title: "", period: period)
+        var h = existing ?? Habit(title: "")
         h.title = title.trimmingCharacters(in: .whitespaces)
         h.why = why.trimmingCharacters(in: .whitespacesAndNewlines)
         h.avoid = avoid
-        h.perWeek = avoid ? 7 : perWeek
-        h.period = period
-        h.reminderOn = reminderOn
-        let c = Calendar.current.dateComponents([.hour, .minute], from: reminderTime)
-        h.reminderHour = c.hour ?? 18
-        h.reminderMinute = c.minute ?? 0
+        h.perWeek = 7
+        h.icon = icon
+        h.reminders = Array(reminders.prefix(2))
         if existing == nil && !store.canAddHabit {
             dismiss()
             return
         }
         store.saveHabit(h)
         dismiss()
+    }
+}
+
+/// Grade de ícones para escolher.
+struct IconPicker: View {
+    @Binding var selected: String
+    @Environment(\.dismiss) private var dismiss
+
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 14), count: 5)
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 14) {
+                    ForEach(HabitIcons.all, id: \.self) { name in
+                        let on = selected == name
+                        Button {
+                            selected = name
+                            dismiss()
+                        } label: {
+                            Image(systemName: name)
+                                .font(.system(size: 24))
+                                .foregroundStyle(on ? Theme.bg : Theme.text)
+                                .frame(maxWidth: .infinity)
+                                .aspectRatio(1, contentMode: .fit)
+                                .background(Circle().fill(on ? Theme.accent : Theme.card))
+                                .overlay(Circle().strokeBorder(on ? Theme.accent : Theme.track, lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(name)
+                    }
+                }
+                .padding(20)
+            }
+            .screenBackground()
+            .navigationTitle("Escolha um ícone")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("OK") { dismiss() }.fontWeight(.semibold)
+                }
+            }
+        }
     }
 }
 

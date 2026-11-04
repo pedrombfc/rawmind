@@ -42,27 +42,33 @@ enum Notifications {
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [focusID])
     }
 
+    private static func habitIDs(_ habit: Habit) -> [String] {
+        let base = "rawmind.habit.\(habit.id.uuidString)"
+        return [base, base + ".0", base + ".1"]
+    }
+
     static func scheduleHabit(_ habit: Habit) {
         let center = UNUserNotificationCenter.current()
-        let id = "rawmind.habit.\(habit.id.uuidString)"
-        center.removePendingNotificationRequests(withIdentifiers: [id])
-        guard habit.reminderOn else { return }
+        center.removePendingNotificationRequests(withIdentifiers: habitIDs(habit))
+        guard !habit.reminders.isEmpty else { return }
         requestPermission { granted in
             guard granted else { return }
-            let content = UNMutableNotificationContent()
-            content.title = habit.title
-            content.body = "Hora do seu hábito do Monk Mode."
-            content.sound = .default
-            var comps = DateComponents()
-            comps.hour = habit.reminderHour
-            comps.minute = habit.reminderMinute
-            let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: true)
-            center.add(UNNotificationRequest(identifier: id, content: content, trigger: trigger))
+            for (i, r) in habit.reminders.prefix(2).enumerated() {
+                let content = UNMutableNotificationContent()
+                content.title = habit.title
+                content.body = habit.avoid ? "Você se manteve hoje? Marque no Rawmind." : "Hora do seu hábito do Monk Mode."
+                content.sound = .default
+                var comps = DateComponents()
+                comps.hour = r.hour
+                comps.minute = r.minute
+                let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: true)
+                center.add(UNNotificationRequest(identifier: "rawmind.habit.\(habit.id.uuidString).\(i)", content: content, trigger: trigger))
+            }
         }
     }
 
     static func cancelHabit(_ habit: Habit) {
-        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["rawmind.habit.\(habit.id.uuidString)"])
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: habitIDs(habit))
     }
 
     static func cancelAll() {

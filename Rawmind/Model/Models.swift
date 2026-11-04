@@ -16,6 +16,34 @@ enum DayPeriod: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+/// Horário de um lembrete.
+struct HabitReminder: Codable, Hashable, Identifiable {
+    var id: UUID = UUID()
+    var hour: Int
+    var minute: Int
+
+    init(hour: Int, minute: Int) {
+        self.hour = hour
+        self.minute = minute
+    }
+
+    var text: String { String(format: "%02d:%02d", hour, minute) }
+}
+
+/// Ícones que a pessoa pode escolher para um hábito (símbolos da Apple).
+enum HabitIcons {
+    static let all: [String] = [
+        "book", "book.closed", "books.vertical", "pencil.line", "note.text", "graduationcap",
+        "brain.head.profile", "lightbulb", "figure.mind.and.body", "leaf", "sun.max", "sunrise",
+        "moon.zzz", "bed.double", "drop", "cup.and.saucer", "fork.knife", "carrot",
+        "figure.run", "figure.walk", "figure.yoga", "dumbbell", "bicycle", "heart",
+        "lungs", "flame", "bolt", "target", "star", "checkmark.seal",
+        "dollarsign.circle", "chart.line.uptrend.xyaxis", "laptopcomputer", "music.note", "paintbrush", "camera",
+        "globe", "person.2", "phone", "house", "iphone.slash", "nosign",
+        "hand.raised", "wineglass", "snowflake", "clock", "calendar", "list.bullet",
+    ]
+}
+
 /// Um hábito do Monk Mode (ex.: "Ler 10 páginas").
 struct Habit: Codable, Identifiable, Hashable {
     var id: UUID = UUID()
@@ -27,16 +55,35 @@ struct Habit: Codable, Identifiable, Hashable {
     var perWeek: Int = 7
     /// Hábito de "evitar" (ex.: sem redes antes do meio-dia). Confirmado à noite.
     var avoid: Bool = false
-    var reminderOn: Bool = false
-    var reminderHour: Int = 18
-    var reminderMinute: Int = 0
+    /// Nome do ícone (símbolo da Apple).
+    var icon: String = "flame"
+    /// Até 2 lembretes por dia.
+    var reminders: [HabitReminder] = []
 
-    init(title: String, period: DayPeriod, why: String = "", perWeek: Int = 7, avoid: Bool = false) {
+    init(title: String, period: DayPeriod = .qualquer, why: String = "", perWeek: Int = 7, avoid: Bool = false, icon: String = "flame") {
         self.title = title
         self.period = period
         self.why = why
         self.perWeek = avoid ? 7 : perWeek
         self.avoid = avoid
+        self.icon = icon
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, title, period, why, perWeek, avoid, icon, reminders
+        case reminderOn, reminderHour, reminderMinute
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(title, forKey: .title)
+        try c.encode(period, forKey: .period)
+        try c.encode(why, forKey: .why)
+        try c.encode(perWeek, forKey: .perWeek)
+        try c.encode(avoid, forKey: .avoid)
+        try c.encode(icon, forKey: .icon)
+        try c.encode(reminders, forKey: .reminders)
     }
 
     init(from decoder: Decoder) throws {
@@ -47,9 +94,21 @@ struct Habit: Codable, Identifiable, Hashable {
         why = try c.decodeIfPresent(String.self, forKey: .why) ?? ""
         perWeek = try c.decodeIfPresent(Int.self, forKey: .perWeek) ?? 7
         avoid = try c.decodeIfPresent(Bool.self, forKey: .avoid) ?? false
-        reminderOn = try c.decodeIfPresent(Bool.self, forKey: .reminderOn) ?? false
-        reminderHour = try c.decodeIfPresent(Int.self, forKey: .reminderHour) ?? 18
-        reminderMinute = try c.decodeIfPresent(Int.self, forKey: .reminderMinute) ?? 0
+        icon = try c.decodeIfPresent(String.self, forKey: .icon) ?? (avoid ? "nosign" : "flame")
+        if let list = try c.decodeIfPresent([HabitReminder].self, forKey: .reminders) {
+            reminders = list
+        } else if try c.decodeIfPresent(Bool.self, forKey: .reminderOn) == true {
+            // Versão antiga: um lembrete só.
+            let h = try c.decodeIfPresent(Int.self, forKey: .reminderHour) ?? 18
+            let m = try c.decodeIfPresent(Int.self, forKey: .reminderMinute) ?? 0
+            reminders = [HabitReminder(hour: h, minute: m)]
+        }
+    }
+
+    /// Texto curto ao lado do hábito na lista ("Evitar", "08:00" ou nada).
+    var sideText: String {
+        if avoid { return "Evitar" }
+        return reminders.first?.text ?? ""
     }
 
     var frequencyText: String {
@@ -303,18 +362,18 @@ enum Library {
     ]
 
     static let habits: [Habit] = [
-        Habit(title: "Treinar", period: .qualquer, why: "Mais energia e cabeça mais leve"),
-        Habit(title: "Beber 2L de água", period: .qualquer, why: "Menos cansaço e dor de cabeça"),
-        Habit(title: "Dormir antes da meia-noite", period: .noite, why: "Acordar sem brigar com o despertador"),
-        Habit(title: "Ler 10 páginas", period: .tarde, why: "Trocar scroll por ideias"),
-        Habit(title: "Meditar 10 min", period: .manha, why: "Menos ansiedade, mais foco"),
-        Habit(title: "1 hora de foco profundo", period: .tarde, why: "Avançar no que importa de verdade"),
-        Habit(title: "Anotar os gastos do dia", period: .noite, why: "Saber pra onde vai o dinheiro"),
-        Habit(title: "Celular fora do quarto", period: .noite, why: "Dormir melhor e acordar sem tela"),
-        Habit(title: "Sem redes antes do meio-dia", period: .noite, why: "Manhã minha, não do feed", avoid: true),
-        Habit(title: "Sem pornografia", period: .noite, why: "Mais controle e mais energia", avoid: true),
-        Habit(title: "Sem álcool", period: .noite, why: "Sono e disposição melhores", avoid: true),
-        Habit(title: "Sem doce", period: .noite, why: "Energia estável durante o dia", avoid: true),
+        Habit(title: "Treinar", why: "Mais energia e cabeça mais leve", icon: "dumbbell"),
+        Habit(title: "Beber 2L de água", why: "Menos cansaço e dor de cabeça", icon: "drop"),
+        Habit(title: "Dormir antes da meia-noite", why: "Acordar sem brigar com o despertador", icon: "moon.zzz"),
+        Habit(title: "Ler 10 páginas", why: "Trocar scroll por ideias", icon: "book"),
+        Habit(title: "Meditar 10 min", why: "Menos ansiedade, mais foco", icon: "figure.mind.and.body"),
+        Habit(title: "1 hora de foco profundo", why: "Avançar no que importa de verdade", icon: "brain.head.profile"),
+        Habit(title: "Anotar os gastos do dia", why: "Saber pra onde vai o dinheiro", icon: "dollarsign.circle"),
+        Habit(title: "Celular fora do quarto", why: "Dormir melhor e acordar sem tela", icon: "iphone.slash"),
+        Habit(title: "Sem redes antes do meio-dia", why: "Manhã minha, não do feed", avoid: true, icon: "nosign"),
+        Habit(title: "Sem pornografia", why: "Mais controle e mais energia", avoid: true, icon: "hand.raised"),
+        Habit(title: "Sem álcool", why: "Sono e disposição melhores", avoid: true, icon: "wineglass"),
+        Habit(title: "Sem doce", why: "Energia estável durante o dia", avoid: true, icon: "nosign"),
     ]
 
     static let alternatives: [String] = [

@@ -346,7 +346,7 @@ private struct HabitsStep: View {
                                 .font(.inter(16, .medium))
                                 .foregroundStyle(Theme.text)
                             Spacer(minLength: 0)
-                            Text(habit.avoid ? "Evitar" : habit.period.rawValue)
+                            Text(habit.sideText)
                                 .font(.inter(13))
                                 .foregroundStyle(Theme.muted)
                         }

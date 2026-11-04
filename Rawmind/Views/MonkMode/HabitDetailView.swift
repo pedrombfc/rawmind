@@ -70,7 +70,7 @@ struct HabitDetailView: View {
                 // Topo
                 VStack(spacing: 10) {
                     ProgressRing(value: Double(done) / Double(habit.target), color: doneToday ? Theme.done : Theme.accent, size: 120, lineWidth: 8) {
-                        Image(systemName: doneToday ? "checkmark" : (habit.avoid ? "nosign" : "flame"))
+                        Image(systemName: habit.icon)
                             .font(.system(size: 40, weight: .semibold))
                     }
                     Text(habit.title)

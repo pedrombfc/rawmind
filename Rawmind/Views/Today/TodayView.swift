@@ -156,7 +156,7 @@ struct TodayView: View {
                                 .foregroundStyle(done ? Theme.muted : Theme.text)
                                 .strikethrough(done, color: Theme.muted)
                             Spacer(minLength: 0)
-                            Text(habit.avoid ? "Evitar" : habit.period.rawValue)
+                            Text(habit.sideText)
                                 .font(.inter(13))
                                 .foregroundStyle(Theme.muted)
                         }

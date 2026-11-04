@@ -122,7 +122,7 @@ struct HabitCard: View {
         let done = store.habitDoneDays(habit)
         HStack(spacing: 16) {
             ProgressRing(value: Double(done) / Double(habit.target), color: store.isHabitDone(habit) ? Theme.done : Theme.accent) {
-                Image(systemName: store.isHabitDone(habit) ? "checkmark" : (habit.avoid ? "nosign" : "flame"))
+                Image(systemName: habit.icon)
                     .font(.system(size: 20, weight: .semibold))
             }
             VStack(alignment: .leading, spacing: 4) {
