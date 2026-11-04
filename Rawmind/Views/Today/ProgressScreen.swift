@@ -4,8 +4,6 @@ import SwiftUI
 struct ProgressScreen: View {
     @Environment(Store.self) private var store
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 6)
-
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -18,9 +16,19 @@ struct ProgressScreen: View {
                     }
 
                     let statuses = store.statuses(upTo: store.phaseTarget)
-                    LazyVGrid(columns: columns, spacing: 8) {
-                        ForEach(Array(statuses.enumerated()), id: \.offset) { index, status in
-                            DayCell(day: index + 1, status: status)
+                    let rowCount = (statuses.count + 5) / 6
+                    VStack(spacing: 8) {
+                        ForEach(0..<rowCount, id: \.self) { r in
+                            HStack(spacing: 8) {
+                                ForEach(0..<6, id: \.self) { c in
+                                    let index = r * 6 + c
+                                    if index < statuses.count {
+                                        DayCell(day: index + 1, status: statuses[index])
+                                    } else {
+                                        Color.clear.frame(maxWidth: .infinity)
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -98,6 +106,7 @@ private struct DayCell: View {
                 .font(.inter(14, status == .done ? .semibold : .regular))
                 .foregroundStyle(textColor)
         }
+        .frame(maxWidth: .infinity)
         .aspectRatio(1, contentMode: .fit)
         .accessibilityLabel("Dia \(day), \(label)")
     }

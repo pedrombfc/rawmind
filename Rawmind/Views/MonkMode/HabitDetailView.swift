@@ -26,6 +26,8 @@ struct HabitDetailView: View {
         .screenBackground()
         .foregroundStyle(Theme.text)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Theme.bg, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -78,7 +80,7 @@ struct HabitDetailView: View {
                         .font(.inter(15))
                         .foregroundStyle(Theme.muted)
                 }
-                .padding(.top, 8)
+                .padding(.top, 16)
 
                 if !habit.why.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
@@ -235,20 +237,31 @@ struct MonthCalendar: View {
             .foregroundStyle(Theme.text)
 
             let symbols = weekdaySymbols()
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 8) {
-                ForEach(0..<7, id: \.self) { i in
-                    Text(symbols[i])
-                        .font(.inter(11, .semibold))
-                        .foregroundStyle(Theme.muted)
+            let rows = stride(from: 0, to: days.count, by: 7).map { start in
+                (0..<7).map { i in start + i < days.count ? days[start + i] : nil }
+            }
+            VStack(spacing: 8) {
+                HStack(spacing: 6) {
+                    ForEach(0..<7, id: \.self) { i in
+                        Text(symbols[i])
+                            .font(.inter(11, .semibold))
+                            .foregroundStyle(Theme.muted)
+                            .frame(maxWidth: .infinity)
+                    }
                 }
-                ForEach(Array(days.enumerated()), id: \.offset) { _, date in
-                    if let date {
-                        DayDot(date: date, state: state(for: date))
-                    } else {
-                        Color.clear.frame(height: 36)
+                ForEach(0..<rows.count, id: \.self) { r in
+                    HStack(spacing: 6) {
+                        ForEach(0..<7, id: \.self) { c in
+                            if let date = rows[r][c] {
+                                DayDot(date: date, state: state(for: date))
+                            } else {
+                                Color.clear.frame(maxWidth: .infinity).frame(height: 36)
+                            }
+                        }
                     }
                 }
             }
+            .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 14) {
                 legend(Theme.done, "Feito")
