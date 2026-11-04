@@ -14,7 +14,7 @@ struct ActivityCard: View {
                 .foregroundStyle(Theme.text)
                 .frame(height: 24, alignment: .leading)
             Spacer(minLength: 6)
-            Text(activity.title)
+            Text(activity.cardTitle)
                 .font(.inter(16, .semibold))
                 .foregroundStyle(Theme.text)
                 .lineLimit(1)

@@ -117,7 +117,7 @@ struct ProgressScreen: View {
 
     private func categoryTile(_ category: ActivityCategory, _ month: [MindSession]) -> some View {
         let n = store.activityCount(category, in: month)
-        return tile("\(n)", (n == 1 ? "tarefa " : "tarefas ") + category.monthLabel)
+        return tile("\(n)", category.monthLabel(n))
     }
 
     private func tile(_ value: String, _ label: String) -> some View {

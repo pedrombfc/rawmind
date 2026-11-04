@@ -26,14 +26,15 @@ enum ActivityCategory: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    /// Rótulo do quadrinho no "Seu mês".
-    var monthLabel: String {
+    /// Rótulo do quadrinho no "Seu mês" (singular ou plural).
+    func monthLabel(_ n: Int) -> String {
+        let t = n == 1 ? "tarefa" : "tarefas"
         switch self {
-        case .mente: return "de mente"
-        case .produtividade: return "de produtividade"
-        case .criatividade: return "criativas"
-        case .corpo: return "pro corpo"
-        case .pessoas: return "com pessoas"
+        case .mente: return "\(t) de mente"
+        case .produtividade: return "\(t) de produtividade"
+        case .criatividade: return n == 1 ? "tarefa criativa" : "tarefas criativas"
+        case .corpo: return "\(t) pro corpo"
+        case .pessoas: return "\(t) com pessoas"
         }
     }
 
@@ -52,6 +53,10 @@ struct Activity: Identifiable, Hashable {
     let hint: String
     /// Quando é uma das telas de mente.
     var mind: MindKind? = nil
+    /// Nome mais curto para caber no cartão.
+    var short: String? = nil
+
+    var cardTitle: String { short ?? title }
 
     var minuteOptions: [Int] {
         if let mind { return mind.minuteOptions }
@@ -88,7 +93,7 @@ struct Activity: Identifiable, Hashable {
         Activity(id: "mesa", title: "Organizar a mesa", icon: "tray.full", minutes: 5, category: .produtividade,
                  hint: "Tire tudo que não é pra agora. Mesa limpa, cabeça mais leve."),
         Activity(id: "pendencia", title: "Resolver uma pendência", icon: "checkmark.circle", minutes: 10, category: .produtividade,
-                 hint: "Aquela coisa que você está adiando há dias. Só ela."),
+                 hint: "Aquela coisa que você está adiando há dias. Só ela.", short: "Pendência"),
 
         // Criatividade
         .fromMind(.escrever, .criatividade),
@@ -97,7 +102,7 @@ struct Activity: Identifiable, Hashable {
         Activity(id: "musica", title: "Tocar música", icon: "guitars", minutes: 15, category: .criatividade,
                  hint: "Pegue o instrumento, ou só cante. Sem gravar, sem postar."),
         Activity(id: "cozinhar", title: "Cozinhar algo novo", icon: "fork.knife", minutes: 30, category: .criatividade,
-                 hint: "Uma receita que você nunca fez. Pode ser simples."),
+                 hint: "Uma receita que você nunca fez. Pode ser simples.", short: "Cozinhar"),
         Activity(id: "ideias", title: "Anotar ideias", icon: "lightbulb", minutes: 5, category: .criatividade,
                  hint: "Num caderno, tudo o que passar pela cabeça. Sem filtro."),
 
@@ -105,17 +110,17 @@ struct Activity: Identifiable, Hashable {
         Activity(id: "alongar", title: "Alongar", icon: "figure.flexibility", minutes: 5, category: .corpo,
                  hint: "Pescoço, ombros, costas e pernas. Devagar, sem pressa."),
         Activity(id: "caminhar", title: "Caminhar sem celular", icon: "figure.walk", minutes: 15, category: .corpo,
-                 hint: "Deixe o celular em casa e dê uma volta no quarteirão."),
+                 hint: "Deixe o celular em casa e dê uma volta no quarteirão.", short: "Caminhar"),
         Activity(id: "flexoes", title: "Flexões", icon: "dumbbell", minutes: 3, category: .corpo,
                  hint: "Quantas você conseguir. Se cansar, descansa e faz mais uma série."),
         Activity(id: "agua", title: "Beber água", icon: "drop", minutes: 1, category: .corpo,
                  hint: "Um copo cheio, sem pressa. Seu corpo agradece."),
         Activity(id: "dancar", title: "Dançar uma música", icon: "figure.dance", minutes: 3, category: .corpo,
-                 hint: "Coloque uma música que você gosta e mexa o corpo até ela acabar."),
+                 hint: "Coloque uma música que você gosta e mexa o corpo até ela acabar.", short: "Dançar"),
 
         // Pessoas
         Activity(id: "conversar", title: "Conversar ao vivo", icon: "person.2", minutes: 10, category: .pessoas,
-                 hint: "Vá até alguém da sua casa e puxe assunto. Olho no olho."),
+                 hint: "Vá até alguém da sua casa e puxe assunto. Olho no olho.", short: "Conversar"),
         Activity(id: "familia", title: "Ligar pra família", icon: "phone", minutes: 10, category: .pessoas,
                  hint: "Uma ligação de voz pra alguém que você não vê faz tempo."),
         Activity(id: "ajudar", title: "Ajudar em casa", icon: "heart", minutes: 10, category: .pessoas,
