@@ -469,6 +469,27 @@ final class Store {
         sessions.filter { $0.kind == kind }.reduce(0) { $0 + $1.seconds } / 60
     }
 
+    func pagesRead(in sessions: [MindSession]) -> Int {
+        sessions.filter { $0.kind == .ler }.reduce(0) { $0 + $1.pages }
+    }
+
+    func booksFinished(in sessions: [MindSession]) -> Int {
+        sessions.filter { $0.kind == .ler && $0.finishedBook }.count
+    }
+
+    /// Trocas deste mês (para o "Seu mês").
+    var mindThisMonth: [MindSession] {
+        data.mindSessions.filter { calendar.isDate($0.date, equalTo: Date(), toGranularity: .month) }
+    }
+
+    /// O último livro registrado (para não digitar de novo).
+    var lastBook: String {
+        data.mindSessions
+            .filter { $0.kind == .ler && !$0.title.isEmpty }
+            .max { $0.date < $1.date }
+            .map { $0.finishedBook ? "" : $0.title } ?? ""
+    }
+
     /// Tudo o que foi escrito, do mais novo para o mais velho.
     var journal: [MindSession] {
         data.mindSessions.filter { !$0.text.isEmpty }.sorted { $0.date > $1.date }
@@ -647,6 +668,22 @@ final class Store {
             d.secondChancesUsed = [Store.monthKey(for: day7)]
         }
         d.monk = run
+        if mode == "ativo" {
+            // Trocas de exemplo: hoje e no começo do mês.
+            func session(_ kind: MindKind, daysAgo: Int, minutes: Int = 0, pages: Int = 0, book: String = "", finished: Bool = false) -> MindSession {
+                var m = MindSession(kind: kind, seconds: minutes * 60, title: book, pages: pages, finishedBook: finished)
+                m.date = calendar.date(byAdding: .day, value: -daysAgo, to: Date()) ?? Date()
+                return m
+            }
+            d.mindSessions = [
+                session(.ler, daysAgo: 0, pages: 12, book: "O Poder do Hábito"),
+                session(.pensar, daysAgo: 0, minutes: 3),
+                session(.meditar, daysAgo: 1, minutes: 10),
+                session(.ler, daysAgo: 2, pages: 30, book: "O Poder do Hábito"),
+                session(.respirar, daysAgo: 2, minutes: 2),
+                session(.ler, daysAgo: 3, pages: 45, book: "Hábitos Atômicos", finished: true),
+            ]
+        }
         // Tempo de tela de exemplo: 4h10 antes, 2h30 na última semana anotada.
         var base = ScreenTimeEntry(totalMinutes: 250, instagramMinutes: 75)
         base.date = calendar.date(byAdding: .day, value: -21, to: today) ?? today

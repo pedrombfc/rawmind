@@ -1,14 +1,11 @@
 import SwiftUI
 
-/// Progresso: estatísticas em cima (tempo de tela, trocas, caderno) e, embaixo,
-/// as atividades para fazer no lugar do celular.
+/// Progresso: o seu mês, tempo de tela antes x agora, trocas da semana e caderno.
 struct ProgressScreen: View {
     @Environment(Store.self) private var store
-    @State private var path: [MindKind] = []
-    @State private var showOther = false
 
     var body: some View {
-        NavigationStack(path: $path) {
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("Progresso")
@@ -16,17 +13,11 @@ struct ProgressScreen: View {
                         .tracking(-0.6)
                         .padding(.bottom, 4)
 
+                    monthCard
+
                     ScreenTimeCard()
 
                     mindCard
-
-                    let week = store.mindLastWeek
-                    HStack(spacing: 10) {
-                        tile("\(store.mindMinutes(.pensar, in: week))", "min pensando")
-                        tile("\(store.mindMinutes(.ler, in: week))", "min lendo")
-                        tile("\(week.reduce(0) { $0 + $1.wordCount })", "palavras escritas")
-                    }
-                    .fixedSize(horizontal: false, vertical: true)
 
                     NavigationLink {
                         JournalView()
@@ -49,9 +40,6 @@ struct ProgressScreen: View {
                         .card(padding: 14, radius: 20)
                     }
                     .buttonStyle(.plain)
-
-                    activities
-                        .padding(.top, 10)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
@@ -61,18 +49,42 @@ struct ProgressScreen: View {
             .screenBackground()
             .statusBarCover()
             .toolbar(.hidden, for: .navigationBar)
-            .navigationDestination(for: MindKind.self) { kind in
-                if kind == .escrever {
-                    WriteView(onDone: { path.removeAll() })
-                } else {
-                    MindExerciseView(kind: kind, onDone: { path.removeAll() })
+        }
+    }
+
+    // MARK: Seu mês
+
+    private var monthCard: some View {
+        let month = store.mindThisMonth
+        let monthName = PTDate.months[(Calendar.current.component(.month, from: Date()) - 1) % 12]
+        let books = store.booksFinished(in: month)
+        return VStack(alignment: .leading, spacing: 14) {
+            SectionLabel(text: "Seu mês · \(monthName)", color: Theme.accent)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("\(month.count)").font(.archivo(44))
+                Text(month.count == 1 ? "troca em vez do celular" : "trocas em vez do celular")
+                    .font(.inter(15))
+                    .foregroundStyle(Theme.muted)
+            }
+            VStack(spacing: 10) {
+                HStack(spacing: 10) {
+                    tile("\(store.pagesRead(in: month))", "páginas lidas")
+                    tile("\(books)", books == 1 ? "livro terminado" : "livros terminados")
                 }
+                .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 10) {
+                    tile("\(store.mindMinutes(.escrever, in: month))", "min escrevendo")
+                    tile("\(store.mindMinutes(.pensar, in: month))", "min pensando")
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 10) {
+                    tile("\(store.mindMinutes(.respirar, in: month))", "min respirando")
+                    tile("\(store.mindMinutes(.meditar, in: month))", "min meditando")
+                }
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .sheet(isPresented: $showOther) {
-            NavigationStack { OtherSwapView() }
-                .presentationDetents([.medium, .large])
-        }
+        .card(padding: 18, radius: 20)
     }
 
     // MARK: Sua mente
@@ -91,79 +103,6 @@ struct ProgressScreen: View {
             WeekBars(counts: counts)
         }
         .card(padding: 18, radius: 20)
-    }
-
-    // MARK: Em vez do celular
-
-    private static let activityKinds: [MindKind] = [.ler, .escrever, .pensar, .respirar, .meditar, .outro]
-
-    private var activities: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SectionLabel(text: "Em vez do celular", color: Theme.accent)
-            Text("Toque numa atividade pra começar. Fica registrado como uma troca.")
-                .font(.inter(14))
-                .foregroundStyle(Theme.muted)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.bottom, 2)
-            let kinds = ProgressScreen.activityKinds
-            ForEach(0..<(kinds.count / 2), id: \.self) { row in
-                HStack(spacing: 10) {
-                    activityCard(kinds[row * 2])
-                    activityCard(kinds[row * 2 + 1])
-                }
-            }
-        }
-    }
-
-    private func activityCard(_ kind: MindKind) -> some View {
-        let today = store.mindSessions(on: Date()).filter { $0.kind == kind }.count
-        return Button {
-            if kind == .outro {
-                showOther = true
-            } else {
-                path.append(kind)
-            }
-        } label: {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top) {
-                    Image(systemName: kind.icon)
-                        .font(.system(size: 19, weight: .medium))
-                        .frame(width: 44, height: 44)
-                        .background(Circle().fill(Theme.track))
-                    Spacer(minLength: 4)
-                    if today > 0 {
-                        Text("\(today)x hoje")
-                            .font(.inter(13, .semibold))
-                            .foregroundStyle(Theme.done)
-                    }
-                }
-                Spacer(minLength: 0)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(kind == .pensar ? "Pensar" : kind.title)
-                        .font(.inter(16, .semibold))
-                    Text(activitySubtitle(kind))
-                        .font(.inter(13))
-                        .foregroundStyle(Theme.muted)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                }
-            }
-            .foregroundStyle(Theme.text)
-            .padding(16)
-            .frame(maxWidth: .infinity, minHeight: 128, alignment: .topLeading)
-            .background(Theme.card)
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func activitySubtitle(_ kind: MindKind) -> String {
-        switch kind {
-        case .outro: return "Registrar o que fez"
-        case .pensar: return "\(kind.defaultMinutes) min, sem tela"
-        default: return "\(kind.defaultMinutes) min"
-        }
     }
 
     private func tile(_ value: String, _ label: String) -> some View {

@@ -289,6 +289,11 @@ enum MindKind: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
 
     static let exercises: [MindKind] = [.pensar, .escrever, .ler, .respirar, .meditar]
+    /// Cartões "Em vez do celular" na tela Hoje.
+    static let activities: [MindKind] = [.ler, .escrever, .pensar, .respirar, .meditar, .outro]
+
+    /// Nome curto para os cartões.
+    var shortTitle: String { self == .pensar ? "Pensar" : title }
 
     var title: String {
         switch self {
@@ -352,14 +357,20 @@ struct MindSession: Codable, Identifiable, Hashable {
     var seconds: Int = 0
     /// O que a pessoa escreveu (ou anotou depois de pensar/ler).
     var text: String = ""
-    /// A pergunta usada, ou o nome da troca rápida.
+    /// A pergunta usada, o nome da troca rápida ou o livro.
     var title: String = ""
+    /// Páginas lidas (só em "ler").
+    var pages: Int = 0
+    /// Terminou o livro nesta leitura.
+    var finishedBook: Bool = false
 
-    init(kind: MindKind, seconds: Int = 0, text: String = "", title: String = "") {
+    init(kind: MindKind, seconds: Int = 0, text: String = "", title: String = "", pages: Int = 0, finishedBook: Bool = false) {
         self.kind = kind
         self.seconds = seconds
         self.text = text
         self.title = title
+        self.pages = pages
+        self.finishedBook = finishedBook
     }
 
     init(from decoder: Decoder) throws {
@@ -370,6 +381,8 @@ struct MindSession: Codable, Identifiable, Hashable {
         seconds = try c.decodeIfPresent(Int.self, forKey: .seconds) ?? 0
         text = try c.decodeIfPresent(String.self, forKey: .text) ?? ""
         title = try c.decodeIfPresent(String.self, forKey: .title) ?? ""
+        pages = try c.decodeIfPresent(Int.self, forKey: .pages) ?? 0
+        finishedBook = try c.decodeIfPresent(Bool.self, forKey: .finishedBook) ?? false
     }
 
     var wordCount: Int {

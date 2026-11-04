@@ -1,22 +1,24 @@
 import SwiftUI
 import UIKit
 
-/// Tela "Hoje": tempo de tela ganho, rotina matinal, troca, cartão do Monk Mode e foco.
+/// Tela "Hoje": tempo de tela ganho, rotina matinal, cartão do Monk Mode,
+/// atividades "em vez do celular" e foco.
 struct TodayView: View {
     @Environment(Store.self) private var store
     var openMonk: () -> Void = {}
     @State private var showFocus = false
-    @State private var showSwap = false
+    @State private var showOther = false
+    @State private var path = NavigationPath()
     @State private var screenForm: ScreenTimeCard.ScreenFormMode? = nil
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     header
                     routineCard
-                    swapCard
                     monkCard
+                    activitiesSection
                     statsRow
                     focusButton
                         .padding(.top, 8)
@@ -31,12 +33,20 @@ struct TodayView: View {
             .navigationDestination(for: String.self) { value in
                 if value == "routine" { RoutineView() }
             }
+            .navigationDestination(for: MindKind.self) { kind in
+                switch kind {
+                case .ler: ReadLogView(onDone: { path = NavigationPath() })
+                case .escrever: WriteView(onDone: { path = NavigationPath() })
+                default: MindExerciseView(kind: kind, onDone: { path = NavigationPath() })
+                }
+            }
         }
         .sheet(isPresented: $showFocus) {
             FocusView()
         }
-        .fullScreenCover(isPresented: $showSwap) {
-            SwapSheet()
+        .sheet(isPresented: $showOther) {
+            NavigationStack { OtherSwapView() }
+                .presentationDetents([.medium, .large])
         }
         .sheet(item: $screenForm) { mode in
             NavigationStack { ScreenTimeForm(isBaseline: mode == .baseline) }
@@ -192,37 +202,84 @@ struct TodayView: View {
         .buttonStyle(.plain)
     }
 
-    private var swapCard: some View {
-        Button {
-            showSwap = true
-        } label: {
-            HStack(spacing: 14) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Vontade de pegar o celular?")
-                        .font(.archivo(19, bold: true))
-                        .foregroundStyle(Theme.text)
-                    Text("Troca por 3 minutos de pensar, escrever ou ler.")
-                        .font(.inter(14))
-                        .foregroundStyle(Theme.muted)
-                        .multilineTextAlignment(.leading)
+    // MARK: Em vez do celular
+
+    private var activitiesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Em vez do celular")
+                .font(.archivo(24, bold: true))
+                .padding(.top, 8)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(MindKind.activities) { kind in
+                        activityCard(kind)
+                    }
                 }
-                Spacer(minLength: 0)
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(Theme.bg)
-                    .frame(width: 44, height: 44)
-                    .background(Circle().fill(Theme.accent))
+                .padding(.horizontal, 20)
             }
-            .padding(18)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(hex: 0x1F1A12))
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .padding(.horizontal, -20)
+        }
+    }
+
+    private func activityCard(_ kind: MindKind) -> some View {
+        let (subtitle, doneToday) = activitySubtitle(kind)
+        return Button {
+            if kind == .outro {
+                showOther = true
+            } else {
+                path.append(kind)
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                Image(systemName: kind.icon)
+                    .font(.system(size: 25, weight: .medium))
+                    .foregroundStyle(Theme.text)
+                    .frame(height: 30, alignment: .leading)
+                Spacer(minLength: 8)
+                Text(kind.shortTitle)
+                    .font(.inter(17, .semibold))
+                    .foregroundStyle(Theme.text)
+                Text(subtitle)
+                    .font(.inter(14))
+                    .foregroundStyle(doneToday ? Theme.done : Theme.muted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                    .padding(.top, 2)
+            }
+            .padding(16)
+            .frame(width: 180, height: 118, alignment: .leading)
+            .background(Theme.card)
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(Theme.accent, lineWidth: 1.5)
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(Theme.track, lineWidth: 1)
             )
+            .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         }
         .buttonStyle(.plain)
+    }
+
+    /// Subtítulo do cartão: o que já fez hoje (verde) ou a duração sugerida.
+    private func activitySubtitle(_ kind: MindKind) -> (String, Bool) {
+        let today = store.mindSessions(on: Date()).filter { $0.kind == kind }
+        if !today.isEmpty {
+            switch kind {
+            case .ler:
+                let p = store.pagesRead(in: today)
+                return (p == 1 ? "1 página hoje" : "\(p) páginas hoje", true)
+            case .outro:
+                return ("\(today.count)x hoje", true)
+            default:
+                let m = store.mindMinutes(kind, in: today)
+                return (m > 0 ? "\(m) min hoje" : "\(today.count)x hoje", true)
+            }
+        }
+        switch kind {
+        case .ler: return ("Registrar páginas", false)
+        case .pensar: return ("\(kind.defaultMinutes) min, sem tela", false)
+        case .outro: return ("Registrar o que fez", false)
+        default: return ("\(kind.defaultMinutes) min", false)
+        }
     }
 
     private var routineSubtitle: String {
