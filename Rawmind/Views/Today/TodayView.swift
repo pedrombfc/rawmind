@@ -7,6 +7,7 @@ struct TodayView: View {
     var openMonk: () -> Void = {}
     @State private var showFocus = false
     @State private var showSwap = false
+    @State private var screenForm: ScreenTimeCard.ScreenFormMode? = nil
 
     var body: some View {
         NavigationStack {
@@ -39,38 +40,127 @@ struct TodayView: View {
         .fullScreenCover(isPresented: $showSwap) {
             SwapSheet()
         }
+        .sheet(item: $screenForm) { mode in
+            NavigationStack { ScreenTimeForm(isBaseline: mode == .baseline) }
+        }
     }
 
     // MARK: Partes
 
+    /// Topo: data e quanto tempo de celular por dia você cortou desde antes do Rawmind.
     private var header: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
                 Text(PTDate.long(Date()))
                     .font(.inter(14))
                     .foregroundStyle(Theme.muted)
-                Group {
-                    if store.monkActive {
-                        (Text("Dia \(min(store.monkDay, Store.monkDays))").foregroundColor(Theme.text)
-                         + Text(" de \(Store.monkDays)").font(.archivo(20)).foregroundColor(Theme.muted))
-                    } else {
-                        Text("Hoje")
+                Spacer(minLength: 8)
+                if store.needsScreenUpdate {
+                    Button { screenForm = .week } label: {
+                        Text("Anotar esta semana →")
+                            .font(.inter(14, .semibold))
+                            .foregroundStyle(Theme.accent)
+                            .lineLimit(1)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            if let base = store.data.screenBaseline {
+                if let now = store.latestScreen {
+                    let saved = base.totalMinutes - now.totalMinutes
+                    VStack(alignment: .leading, spacing: 2) {
+                        bigNumber(saved > 0 ? "−\(Store.durationText(saved))" : (saved < 0 ? "+\(Store.durationText(-saved))" : "0 min"),
+                                  color: saved > 0 ? Theme.done : (saved < 0 ? Theme.accent : Theme.text))
+                        Text(saved > 0
+                             ? "de celular, comparado com antes do Rawmind"
+                             : (saved < 0
+                                ? "a mais que antes. Semana difícil acontece: o que conta é a tendência."
+                                : "de diferença por enquanto. Normal no começo."))
+                            .font(.inter(14))
+                            .foregroundStyle(Theme.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    HStack(spacing: 8) {
+                        compareTile("Celular", before: base.totalMinutes, now: now.totalMinutes)
+                        compareTile("Instagram", before: base.instagramMinutes, now: now.instagramMinutes)
+                        if saved > 0 {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Por semana")
+                                    .font(.inter(12))
+                                    .foregroundStyle(Theme.muted)
+                                Text("+\(Store.durationText(saved * 7))")
+                                    .font(.inter(15, .semibold))
+                                    .foregroundStyle(Theme.done)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Theme.card)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        }
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 2) {
+                        bigNumber(Store.durationText(base.totalMinutes), color: Theme.text)
+                        let wait = store.daysUntilScreenUpdate
+                        Text(wait == 0
+                             ? "é o seu ponto de partida. Anote esta semana pra ver quanto ganhou."
+                             : "é o seu ponto de partida. \(wait == 1 ? "Amanhã" : "Daqui a \(wait) dias") você anota de novo e vê quanto ganhou.")
+                            .font(.inter(14))
+                            .foregroundStyle(Theme.muted)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                .font(.archivo(40))
-                .tracking(-0.8)
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Quanto do seu dia vai pro celular?")
+                        .font(.archivo(28))
+                        .tracking(-0.5)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button { screenForm = .baseline } label: {
+                        Text("Anotar agora →")
+                            .font(.inter(15, .semibold))
+                            .foregroundStyle(Theme.accent)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-            Spacer()
-            HStack(spacing: 6) {
-                Circle().fill(Theme.muted).frame(width: 8, height: 8)
-                Text("Escudo em breve")
-                    .font(.inter(13, .medium))
-                    .foregroundStyle(Theme.muted)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(Capsule().fill(Theme.card))
         }
+    }
+
+    private func bigNumber(_ value: String, color: Color) -> some View {
+        (Text(value).foregroundColor(color)
+         + Text(" por dia").font(.archivo(20)).foregroundColor(Theme.muted))
+            .font(.archivo(44))
+            .tracking(-0.8)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+    }
+
+    private func compareTile(_ title: String, before: Int, now: Int) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.inter(12))
+                .foregroundStyle(Theme.muted)
+            HStack(spacing: 4) {
+                Text(Store.durationText(before))
+                    .font(.inter(14))
+                    .foregroundStyle(Theme.muted)
+                    .strikethrough(true, color: Theme.muted)
+                Text(Store.durationText(now))
+                    .font(.inter(14, .semibold))
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.card)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private var routineCard: some View {

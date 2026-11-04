@@ -464,6 +464,18 @@ final class Store {
         return days >= 7
     }
 
+    /// Quantos dias faltam para anotar a semana de novo (0 = já pode).
+    var daysUntilScreenUpdate: Int {
+        guard let base = data.screenBaseline else { return 0 }
+        let last = latestScreen?.date ?? base.date
+        return max(7 - daysBetween(last, Date()), 0)
+    }
+
+    /// Dias de 24 horas por ano, com esse tempo de tela por dia.
+    static func daysPerYear(_ minutesPerDay: Int, hoursPerDay: Double = 24) -> Int {
+        Int((Double(max(minutesPerDay, 0)) * 365 / (hoursPerDay * 60)).rounded())
+    }
+
     func saveBaseline(_ entry: ScreenTimeEntry) {
         update { $0.screenBaseline = entry }
     }
@@ -598,6 +610,13 @@ final class Store {
             d.secondChancesUsed = [Store.monthKey(for: yesterday)]
         }
         d.monk = MonkRun(startDate: start, habitIDs: ids, attempt: 2)
+        // Tempo de tela de exemplo: 4h10 antes, 2h30 na última semana anotada.
+        var base = ScreenTimeEntry(totalMinutes: 250, instagramMinutes: 75)
+        base.date = calendar.date(byAdding: .day, value: -21, to: today) ?? today
+        var week = ScreenTimeEntry(totalMinutes: 150, instagramMinutes: 40)
+        week.date = calendar.date(byAdding: .day, value: -8, to: today) ?? today
+        d.screenBaseline = base
+        d.screenEntries = [week]
         data = d
     }
     #endif
