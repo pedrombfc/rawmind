@@ -10,8 +10,13 @@ struct OnboardingView: View {
     @State private var wakeTime: Date = Calendar.current.date(bySettingHour: 7, minute: 0, second: 0, of: Date()) ?? Date()
     @State private var habits: [Habit] = []
     @State private var alternatives: [String] = ["ler uma página"]
+    @State private var screenH = 4
+    @State private var screenM = 0
+    @State private var instaH = 1
+    @State private var instaM = 0
+    @State private var skipBaseline = false
 
-    private let totalSteps = 6
+    private let totalSteps = 7
 
     var body: some View {
         VStack(spacing: 0) {
@@ -23,10 +28,14 @@ struct OnboardingView: View {
                 Group {
                     switch step {
                     case 0: ManifestoStep()
-                    case 1: RoutineStep(selected: $routine)
-                    case 2: TimeStep(time: $wakeTime)
-                    case 3: HabitsStep(selected: $habits)
-                    case 4: AlternativesStep(selected: $alternatives)
+                    case 1: BaselineStep(totalH: $screenH, totalM: $screenM, instaH: $instaH, instaM: $instaM) {
+                        skipBaseline = true
+                        step += 1
+                    }
+                    case 2: RoutineStep(selected: $routine)
+                    case 3: TimeStep(time: $wakeTime)
+                    case 4: HabitsStep(selected: $habits)
+                    case 5: AlternativesStep(selected: $alternatives)
                     default: CommitStep(
                         routineCount: routine.count,
                         timeText: timeText,
@@ -85,9 +94,12 @@ struct OnboardingView: View {
         VStack(spacing: 20) {
             if step < totalSteps - 1 {
                 StepBars(total: totalSteps, filled: step + 1)
-                Button(buttonTitle) { step += 1 }
-                    .buttonStyle(PrimaryButtonStyle())
-                    .disabled(step == 1 && routine.isEmpty)
+                Button(buttonTitle) {
+                    if step == 1 { skipBaseline = false }
+                    step += 1
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(step == 2 && routine.isEmpty)
             } else {
                 HoldToCommitButton { finish() }
                 Text("Segure por 3 segundos para assinar")
@@ -100,7 +112,7 @@ struct OnboardingView: View {
     private var buttonTitle: String {
         switch step {
         case 0: return "Bora começar"
-        case 3: return habits.isEmpty ? "Pular por agora" : "Continuar"
+        case 4: return habits.isEmpty ? "Pular por agora" : "Continuar"
         default: return "Continuar"
         }
     }
@@ -117,6 +129,7 @@ struct OnboardingView: View {
         let chosenRoutine = routine
         let chosenHabits = habits
         let chosenAlternatives = alternatives
+        let baseline: ScreenTimeEntry? = skipBaseline ? nil : ScreenTimeEntry(totalMinutes: screenH * 60 + screenM, instagramMinutes: instaH * 60 + instaM)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         store.update { d in
             d.routine = chosenRoutine
@@ -124,6 +137,7 @@ struct OnboardingView: View {
             d.routineMinute = minute
             d.habits = chosenHabits
             d.alternatives = chosenAlternatives
+            if let baseline { d.screenBaseline = baseline }
             d.startDate = Calendar.current.startOfDay(for: Date())
             d.onboarded = true
         }
@@ -170,6 +184,41 @@ private struct ManifestoStep: View {
                 .foregroundStyle(Theme.muted)
                 .lineSpacing(5)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+private struct BaselineStep: View {
+    @Binding var totalH: Int
+    @Binding var totalM: Int
+    @Binding var instaH: Int
+    @Binding var instaM: Int
+    let onSkip: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            StepTitle(
+                title: "Seu ponto de partida",
+                subtitle: "Quanto tempo você passa no celular por dia? Veja em Ajustes > Tempo de Uso > Ver toda a atividade. Daqui a umas semanas a gente compara."
+            )
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Celular no total, por dia")
+                    .font(.inter(14, .semibold))
+                    .foregroundStyle(Theme.muted)
+                DurationPicker(hours: $totalH, minutes: $totalM)
+            }
+            .card(padding: 14)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Instagram (ou a rede que mais te prende)")
+                    .font(.inter(14, .semibold))
+                    .foregroundStyle(Theme.muted)
+                DurationPicker(hours: $instaH, minutes: $instaM)
+            }
+            .card(padding: 14)
+            Button("Não sei agora, anoto depois", action: onSkip)
+                .font(.inter(15, .medium))
+                .foregroundStyle(Theme.muted)
+                .frame(maxWidth: .infinity)
         }
     }
 }

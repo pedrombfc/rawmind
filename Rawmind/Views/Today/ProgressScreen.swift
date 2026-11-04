@@ -1,50 +1,53 @@
 import SwiftUI
 
-/// Progresso: os 30 dias da fase 1 (depois 66), com dias feitos e reservas.
+/// Progresso: tempo de tela antes x agora, trocas da semana, caderno e Monk Mode.
 struct ProgressScreen: View {
     @Environment(Store.self) private var store
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        SectionLabel(text: store.phaseTarget == Store.phase1 ? "Fase 1 · 30 dias" : "Fase 2 · até 66 dias", color: Theme.accent)
-                        Text("Progresso")
-                            .font(.archivo(34))
-                            .tracking(-0.6)
-                    }
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Progresso")
+                        .font(.archivo(34))
+                        .tracking(-0.6)
+                        .padding(.bottom, 4)
 
-                    let statuses = store.statuses(upTo: store.phaseTarget)
-                    let rowCount = (statuses.count + 5) / 6
-                    VStack(spacing: 8) {
-                        ForEach(0..<rowCount, id: \.self) { r in
-                            HStack(spacing: 8) {
-                                ForEach(0..<6, id: \.self) { c in
-                                    let index = r * 6 + c
-                                    if index < statuses.count {
-                                        DayCell(day: index + 1, status: statuses[index])
-                                    } else {
-                                        Color.clear.frame(maxWidth: .infinity)
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    ScreenTimeCard()
 
-                    legend
+                    mindCard
 
+                    let week = store.mindLastWeek
                     HStack(spacing: 10) {
-                        tile("\(store.completedDays)", "dias completos")
-                        tile("\(store.reservesLeftThisWeek)", "reservas nesta semana")
-                        tile("\(store.totalFocusMinutes)", "min de foco")
+                        tile("\(store.mindMinutes(.pensar, in: week))", "min pensando")
+                        tile("\(store.mindMinutes(.ler, in: week))", "min lendo")
+                        tile("\(week.reduce(0) { $0 + $1.wordCount })", "palavras escritas")
                     }
 
-                    Text("A sequência nunca zera. Errar um dia não apaga o que você já fez: o que conta é voltar.")
-                        .font(.inter(15))
-                        .foregroundStyle(Theme.muted)
-                        .lineSpacing(4)
-                        .fixedSize(horizontal: false, vertical: true)
+                    NavigationLink {
+                        JournalView()
+                    } label: {
+                        HStack(spacing: 14) {
+                            Image(systemName: "pencil.line")
+                                .font(.system(size: 20, weight: .medium))
+                                .frame(width: 48, height: 48)
+                                .background(Circle().fill(Theme.track))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Seu caderno").font(.inter(16, .semibold))
+                                Text(store.journal.count == 1 ? "1 texto" : "\(store.journal.count) textos")
+                                    .font(.inter(14))
+                                    .foregroundStyle(Theme.muted)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").foregroundStyle(Theme.muted)
+                        }
+                        .foregroundStyle(Theme.text)
+                        .card(padding: 14, radius: 20)
+                    }
+                    .buttonStyle(.plain)
+
+                    monkSection
+                        .padding(.top, 8)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
@@ -56,14 +59,67 @@ struct ProgressScreen: View {
         }
     }
 
-    private var legend: some View {
-        HStack(spacing: 16) {
-            legendItem(Theme.done, "Feito")
-            legendItem(Theme.accent.opacity(0.35), "Reserva")
-            legendItem(Theme.track, "Perdido")
+    // MARK: Sua mente
+
+    private var mindCard: some View {
+        let counts = store.mindDailyCounts
+        let total = counts.reduce(0) { $0 + $1.count }
+        return VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: "Sua mente · últimos 7 dias", color: Theme.accent)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("\(total)").font(.archivo(44))
+                Text(total == 1 ? "troca em vez do celular" : "trocas em vez do celular")
+                    .font(.inter(15))
+                    .foregroundStyle(Theme.muted)
+            }
+            WeekBars(counts: counts)
         }
-        .font(.inter(13))
-        .foregroundStyle(Theme.muted)
+        .card(padding: 18, radius: 20)
+    }
+
+    // MARK: Monk Mode
+
+    private var monkSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            SectionLabel(text: store.phaseTarget == Store.phase1 ? "Monk Mode · Fase 1 · 30 dias" : "Monk Mode · Fase 2 · até 66 dias")
+
+            let statuses = store.statuses(upTo: store.phaseTarget)
+            let rowCount = (statuses.count + 5) / 6
+            VStack(spacing: 8) {
+                ForEach(0..<rowCount, id: \.self) { r in
+                    HStack(spacing: 8) {
+                        ForEach(0..<6, id: \.self) { c in
+                            let index = r * 6 + c
+                            if index < statuses.count {
+                                DayCell(day: index + 1, status: statuses[index])
+                            } else {
+                                Color.clear.frame(maxWidth: .infinity)
+                            }
+                        }
+                    }
+                }
+            }
+
+            HStack(spacing: 16) {
+                legendItem(Theme.done, "Feito")
+                legendItem(Theme.accent.opacity(0.35), "Reserva")
+                legendItem(Theme.track, "Perdido")
+            }
+            .font(.inter(13))
+            .foregroundStyle(Theme.muted)
+
+            HStack(spacing: 10) {
+                tile("\(store.completedDays)", "dias completos")
+                tile("\(store.reservesLeftThisWeek)", "reservas nesta semana")
+                tile("\(store.totalFocusMinutes)", "min de foco")
+            }
+
+            Text("A sequência nunca zera. Errar um dia não apaga o que você já fez: o que conta é voltar.")
+                .font(.inter(15))
+                .foregroundStyle(Theme.muted)
+                .lineSpacing(4)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     private func legendItem(_ color: Color, _ label: String) -> some View {
@@ -87,6 +143,38 @@ struct ProgressScreen: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Theme.track, lineWidth: 1)
         )
+    }
+}
+
+/// Barras das trocas de cada dia (hoje em âmbar).
+private struct WeekBars: View {
+    let counts: [DayCount]
+
+    var body: some View {
+        let maxValue = max(counts.map(\.count).max() ?? 0, 1)
+        HStack(alignment: .bottom, spacing: 8) {
+            ForEach(Array(counts.enumerated()), id: \.offset) { index, day in
+                let isToday = index == counts.count - 1
+                VStack(spacing: 6) {
+                    Text("\(day.count)")
+                        .font(.inter(12))
+                        .foregroundStyle(Theme.muted)
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(isToday ? Theme.accent : (day.count == 0 ? Theme.track : Theme.done))
+                        .frame(height: CGFloat(day.count) / CGFloat(maxValue) * 90 + 4)
+                    Text(isToday ? "HOJE" : weekday(day.date))
+                        .font(.inter(11, .semibold))
+                        .foregroundStyle(Theme.muted)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .frame(height: 140, alignment: .bottom)
+    }
+
+    private func weekday(_ date: Date) -> String {
+        let names = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"]
+        return names[(Calendar.current.component(.weekday, from: date) - 1) % 7]
     }
 }
 

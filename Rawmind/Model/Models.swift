@@ -120,6 +120,12 @@ struct AppData: Codable {
     var days: [String: DayRecord] = [:]
     /// Conclusão de cada hábito no fim dos 30 dias (chave = id do hábito).
     var conclusions: [String: HabitConclusion] = [:]
+    /// Trocas feitas (ler, escrever, pensar...).
+    var mindSessions: [MindSession] = []
+    /// Tempo de tela antes de começar.
+    var screenBaseline: ScreenTimeEntry? = nil
+    /// Registros semanais depois de começar.
+    var screenEntries: [ScreenTimeEntry] = []
 
     init() {}
 
@@ -134,6 +140,152 @@ struct AppData: Codable {
         alternatives = try c.decodeIfPresent([String].self, forKey: .alternatives) ?? []
         days = try c.decodeIfPresent([String: DayRecord].self, forKey: .days) ?? [:]
         conclusions = try c.decodeIfPresent([String: HabitConclusion].self, forKey: .conclusions) ?? [:]
+        mindSessions = try c.decodeIfPresent([MindSession].self, forKey: .mindSessions) ?? []
+        screenBaseline = try c.decodeIfPresent(ScreenTimeEntry.self, forKey: .screenBaseline)
+        screenEntries = try c.decodeIfPresent([ScreenTimeEntry].self, forKey: .screenEntries) ?? []
+    }
+}
+
+/// Atividades de "troca": o que fazer em vez de pegar o celular.
+enum MindKind: String, Codable, CaseIterable, Identifiable {
+    case ler, escrever, pensar, respirar, outro
+
+    var id: String { rawValue }
+
+    static let exercises: [MindKind] = [.pensar, .escrever, .ler, .respirar]
+
+    var title: String {
+        switch self {
+        case .ler: return "Ler"
+        case .escrever: return "Escrever"
+        case .pensar: return "Pensar sem fazer nada"
+        case .respirar: return "Respirar"
+        case .outro: return "Outra troca"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .ler: return "Uma página de um livro de verdade"
+        case .escrever: return "Algumas linhas sobre o que está na sua cabeça"
+        case .pensar: return "Só você e uma pergunta. Sem tela."
+        case .respirar: return "Devagar, para a cabeça baixar"
+        case .outro: return ""
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .ler: return "book"
+        case .escrever: return "pencil.line"
+        case .pensar: return "brain.head.profile"
+        case .respirar: return "wind"
+        case .outro: return "sparkles"
+        }
+    }
+
+    var defaultMinutes: Int {
+        switch self {
+        case .ler: return 5
+        case .escrever: return 3
+        case .pensar: return 3
+        case .respirar: return 1
+        case .outro: return 0
+        }
+    }
+
+    var minuteOptions: [Int] {
+        switch self {
+        case .respirar: return [1, 2, 3]
+        case .ler: return [2, 5, 10, 20]
+        default: return [1, 3, 5, 10]
+        }
+    }
+}
+
+/// Uma troca feita (ex.: 3 minutos pensando).
+struct MindSession: Codable, Identifiable, Hashable {
+    var id: UUID = UUID()
+    var kind: MindKind
+    var date: Date = Date()
+    var seconds: Int = 0
+    /// O que a pessoa escreveu (ou anotou depois de pensar/ler).
+    var text: String = ""
+    /// A pergunta usada, ou o nome da troca rápida.
+    var title: String = ""
+
+    init(kind: MindKind, seconds: Int = 0, text: String = "", title: String = "") {
+        self.kind = kind
+        self.seconds = seconds
+        self.text = text
+        self.title = title
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        kind = try c.decodeIfPresent(MindKind.self, forKey: .kind) ?? .outro
+        date = try c.decodeIfPresent(Date.self, forKey: .date) ?? Date()
+        seconds = try c.decodeIfPresent(Int.self, forKey: .seconds) ?? 0
+        text = try c.decodeIfPresent(String.self, forKey: .text) ?? ""
+        title = try c.decodeIfPresent(String.self, forKey: .title) ?? ""
+    }
+
+    var wordCount: Int {
+        text.split { $0.isWhitespace || $0.isNewline }.count
+    }
+}
+
+/// Tempo de tela anotado pela pessoa (média por dia).
+struct ScreenTimeEntry: Codable, Identifiable, Hashable {
+    var id: UUID = UUID()
+    var date: Date = Date()
+    var totalMinutes: Int
+    var instagramMinutes: Int
+    /// Vezes que pegou o celular por dia (0 = não informado).
+    var pickups: Int = 0
+
+    init(totalMinutes: Int, instagramMinutes: Int, pickups: Int = 0) {
+        self.totalMinutes = totalMinutes
+        self.instagramMinutes = instagramMinutes
+        self.pickups = pickups
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        date = try c.decodeIfPresent(Date.self, forKey: .date) ?? Date()
+        totalMinutes = try c.decodeIfPresent(Int.self, forKey: .totalMinutes) ?? 0
+        instagramMinutes = try c.decodeIfPresent(Int.self, forKey: .instagramMinutes) ?? 0
+        pickups = try c.decodeIfPresent(Int.self, forKey: .pickups) ?? 0
+    }
+}
+
+/// Perguntas para pensar e escrever.
+enum Prompts {
+    static let think: [String] = [
+        "O que você faria hoje se não existisse celular?",
+        "Qual problema seu você ainda não parou pra pensar de verdade?",
+        "Uma ideia que é só sua, que não veio de nenhum vídeo.",
+        "Quem você quer ser daqui a 30 dias?",
+        "O que te deixou entediado hoje? O que isso diz sobre você?",
+        "Do que você sentiu falta essa semana?",
+        "Se você tivesse uma tarde livre sem tela, o que faria?",
+        "Qual decisão você está adiando?",
+    ]
+
+    static let write: [String] = [
+        "O que estava na sua cabeça agora, antes de pegar o celular?",
+        "Três coisas que aconteceram hoje.",
+        "Uma coisa que você aprendeu essa semana.",
+        "O que está te travando agora?",
+        "Pelo que você é grato hoje?",
+        "Uma conversa que você quer ter e ainda não teve.",
+        "Como foi a sua manhã sem tela?",
+    ]
+
+    static func pick(_ list: [String], _ seed: Int) -> String {
+        list[((seed % list.count) + list.count) % list.count]
     }
 }
 

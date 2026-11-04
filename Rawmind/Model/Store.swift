@@ -1,6 +1,12 @@
 import Foundation
 import Observation
 
+struct DayCount: Identifiable, Hashable {
+    let date: Date
+    let count: Int
+    var id: Date { date }
+}
+
 struct NoteEntry: Identifiable, Hashable {
     let key: String
     let text: String
@@ -205,6 +211,71 @@ final class Store {
     }
 
     var canAddHabit: Bool { data.habits.count < Store.maxHabits }
+
+    // MARK: Trocas (mente)
+
+    func logMind(_ session: MindSession) {
+        update { $0.mindSessions.append(session) }
+    }
+
+    func mindSessions(on date: Date) -> [MindSession] {
+        data.mindSessions.filter { calendar.isDate($0.date, inSameDayAs: date) }
+    }
+
+    var swapsToday: Int { mindSessions(on: Date()).count }
+
+    /// Trocas dos últimos 7 dias (hoje incluído).
+    var mindLastWeek: [MindSession] {
+        let start = calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: Date())) ?? Date()
+        return data.mindSessions.filter { $0.date >= start }
+    }
+
+    /// Quantidade de trocas em cada um dos últimos 7 dias, do mais antigo para hoje.
+    var mindDailyCounts: [DayCount] {
+        let today = calendar.startOfDay(for: Date())
+        return (0..<7).reversed().map { back in
+            let day = calendar.date(byAdding: .day, value: -back, to: today) ?? today
+            return DayCount(date: day, count: mindSessions(on: day).count)
+        }
+    }
+
+    func mindMinutes(_ kind: MindKind, in sessions: [MindSession]) -> Int {
+        sessions.filter { $0.kind == kind }.reduce(0) { $0 + $1.seconds } / 60
+    }
+
+    /// Tudo o que foi escrito, do mais novo para o mais velho.
+    var journal: [MindSession] {
+        data.mindSessions.filter { !$0.text.isEmpty }.sorted { $0.date > $1.date }
+    }
+
+    // MARK: Tempo de tela
+
+    var latestScreen: ScreenTimeEntry? {
+        data.screenEntries.max { $0.date < $1.date }
+    }
+
+    /// Hora de registrar a semana de novo?
+    var needsScreenUpdate: Bool {
+        guard let base = data.screenBaseline else { return false }
+        let last = latestScreen?.date ?? base.date
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: last), to: calendar.startOfDay(for: Date())).day ?? 0
+        return days >= 7
+    }
+
+    func saveBaseline(_ entry: ScreenTimeEntry) {
+        update { $0.screenBaseline = entry }
+    }
+
+    func addScreenEntry(_ entry: ScreenTimeEntry) {
+        update { $0.screenEntries.append(entry) }
+    }
+
+    /// "3h40", "45 min".
+    static func durationText(_ minutes: Int) -> String {
+        let m = max(minutes, 0)
+        if m < 60 { return "\(m) min" }
+        return String(format: "%dh%02d", m / 60, m % 60)
+    }
 
     func addFocusMinutes(_ minutes: Int) {
         guard minutes > 0 else { return }

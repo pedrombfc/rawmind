@@ -5,6 +5,7 @@ import UIKit
 struct TodayView: View {
     @Environment(Store.self) private var store
     @State private var showFocus = false
+    @State private var showSwap = false
 
     var body: some View {
         NavigationStack {
@@ -13,6 +14,7 @@ struct TodayView: View {
                     header
                     ThinBar(value: Double(min(store.dayNumber, store.phaseTarget)) / Double(store.phaseTarget))
                     routineCard
+                    swapCard
                     habitsSection
                     statsRow
                     focusButton
@@ -30,6 +32,9 @@ struct TodayView: View {
         }
         .sheet(isPresented: $showFocus) {
             FocusView()
+        }
+        .fullScreenCover(isPresented: $showSwap) {
+            SwapSheet()
         }
     }
 
@@ -88,6 +93,39 @@ struct TodayView: View {
         .buttonStyle(.plain)
     }
 
+    private var swapCard: some View {
+        Button {
+            showSwap = true
+        } label: {
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Vontade de pegar o celular?")
+                        .font(.archivo(19, bold: true))
+                        .foregroundStyle(Theme.text)
+                    Text("Troca por 3 minutos de pensar, escrever ou ler.")
+                        .font(.inter(14))
+                        .foregroundStyle(Theme.muted)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Theme.bg)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(Theme.accent))
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(hex: 0x1F1A12))
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(Theme.accent, lineWidth: 1.5)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
     private var routineSubtitle: String {
         if store.routineComplete { return "Feita. O dia é seu." }
         let missing = store.data.routine.filter { !store.isRoutineItemDone($0) }.map(\.title)
@@ -133,7 +171,7 @@ struct TodayView: View {
     private var statsRow: some View {
         HStack(spacing: 10) {
             statTile(value: "\(store.completedDays)", label: store.completedDays == 1 ? "dia com a rotina feita" : "dias com a rotina feita")
-            statTile(value: "\(store.reservesLeftThisWeek)", label: store.reservesLeftThisWeek == 1 ? "reserva nesta semana" : "reservas nesta semana")
+            statTile(value: "\(store.swapsToday)", label: store.swapsToday == 1 ? "troca hoje" : "trocas hoje")
         }
     }
 
