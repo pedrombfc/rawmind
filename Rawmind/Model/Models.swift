@@ -284,11 +284,11 @@ struct MonkAttempt: Codable, Hashable, Identifiable {
 
 /// Atividades de "troca": o que fazer em vez de pegar o celular.
 enum MindKind: String, Codable, CaseIterable, Identifiable {
-    case ler, escrever, pensar, respirar, outro
+    case ler, escrever, pensar, respirar, meditar, outro
 
     var id: String { rawValue }
 
-    static let exercises: [MindKind] = [.pensar, .escrever, .ler, .respirar]
+    static let exercises: [MindKind] = [.pensar, .escrever, .ler, .respirar, .meditar]
 
     var title: String {
         switch self {
@@ -296,7 +296,8 @@ enum MindKind: String, Codable, CaseIterable, Identifiable {
         case .escrever: return "Escrever"
         case .pensar: return "Pensar sem fazer nada"
         case .respirar: return "Respirar"
-        case .outro: return "Outra troca"
+        case .meditar: return "Meditar"
+        case .outro: return "Outra coisa"
         }
     }
 
@@ -306,7 +307,8 @@ enum MindKind: String, Codable, CaseIterable, Identifiable {
         case .escrever: return "Algumas linhas sobre o que está na sua cabeça"
         case .pensar: return "Só você e uma pergunta. Sem tela."
         case .respirar: return "Devagar, para a cabeça baixar"
-        case .outro: return ""
+        case .meditar: return "Olhos fechados, atenção no ar"
+        case .outro: return "Registrar o que você fez"
         }
     }
 
@@ -316,7 +318,8 @@ enum MindKind: String, Codable, CaseIterable, Identifiable {
         case .escrever: return "pencil.line"
         case .pensar: return "brain.head.profile"
         case .respirar: return "wind"
-        case .outro: return "sparkles"
+        case .meditar: return "figure.mind.and.body"
+        case .outro: return "plus"
         }
     }
 
@@ -326,6 +329,7 @@ enum MindKind: String, Codable, CaseIterable, Identifiable {
         case .escrever: return 3
         case .pensar: return 3
         case .respirar: return 1
+        case .meditar: return 5
         case .outro: return 0
         }
     }
@@ -334,6 +338,7 @@ enum MindKind: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .respirar: return [1, 2, 3]
         case .ler: return [2, 5, 10, 20]
+        case .meditar: return [3, 5, 10, 15]
         default: return [1, 3, 5, 10]
         }
     }

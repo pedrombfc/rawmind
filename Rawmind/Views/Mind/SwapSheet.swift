@@ -294,6 +294,7 @@ struct MindExerciseView: View {
         switch kind {
         case .ler: return "Pega um livro."
         case .respirar: return "Um minuto só seu."
+        case .meditar: return "Fecha os olhos."
         default: return kind.title
         }
     }
@@ -303,6 +304,7 @@ struct MindExerciseView: View {
         case .pensar: return "Celular virado pra baixo. Não precisa chegar a resposta nenhuma. Deixa a cabeça andar."
         case .ler: return "De papel, de preferência. Uma página já conta."
         case .respirar: return "Inspira em 4 segundos, solta em 6. Acompanha o círculo."
+        case .meditar: return "Senta confortável e presta atenção no ar entrando e saindo. Se a cabeça fugir, volta pra respiração."
         default: return ""
         }
     }
@@ -311,6 +313,7 @@ struct MindExerciseView: View {
         switch kind {
         case .pensar: return "Se a cabeça fugir da pergunta, tudo bem. Só não pega o celular."
         case .ler: return "Celular virado pra baixo. O tempo é do livro."
+        case .meditar: return "Olhos fechados. O celular vibra quando acabar."
         default: return ""
         }
     }
@@ -459,5 +462,61 @@ struct JournalView: View {
         .screenBackground()
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Theme.bg, for: .navigationBar)
+    }
+}
+
+/// "Outra coisa": anotar o que você fez no lugar do celular.
+struct OtherSwapView: View {
+    @Environment(Store.self) private var store
+    @Environment(\.dismiss) private var dismiss
+    @State private var text = ""
+
+    var body: some View {
+        Form {
+            Section {
+                TextField("Ex.: Saí pra caminhar, arrumei o quarto", text: $text, axis: .vertical)
+                    .lineLimit(1...3)
+            } header: {
+                Text("O que você fez em vez do celular?")
+            }
+            .listRowBackground(Theme.card)
+
+            if !store.data.alternatives.isEmpty {
+                Section("Do seu plano") {
+                    ForEach(store.data.alternatives, id: \.self) { alt in
+                        Button {
+                            save(alt)
+                        } label: {
+                            Text(alt.prefix(1).uppercased() + alt.dropFirst())
+                                .foregroundStyle(Theme.text)
+                        }
+                    }
+                }
+                .listRowBackground(Theme.card)
+            }
+        }
+        .font(.inter(16))
+        .scrollContentBackground(.hidden)
+        .screenBackground()
+        .navigationTitle("Outra coisa")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancelar") { dismiss() }
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Registrar") { save(text) }
+                    .fontWeight(.semibold)
+                    .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+    }
+
+    private func save(_ value: String) {
+        let t = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return }
+        store.logMind(MindSession(kind: .outro, title: t))
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        dismiss()
     }
 }

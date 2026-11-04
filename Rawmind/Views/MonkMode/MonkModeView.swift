@@ -164,6 +164,9 @@ private struct MonkActiveView: View {
                     .frame(maxWidth: .infinity)
                     .multilineTextAlignment(.center)
                     .padding(.top, 2)
+
+                MonkDaysGrid()
+                    .padding(.top, 10)
             }
             .padding(.horizontal, 20)
             .padding(.top, 16)
@@ -326,6 +329,9 @@ private struct MonkCompletedView: View {
                     .buttonStyle(.plain)
                 }
 
+                MonkDaysGrid()
+                    .padding(.top, 8)
+
                 Button("Começar outro Monk Mode", action: startNew)
                     .buttonStyle(PrimaryButtonStyle())
                     .padding(.top, 8)
@@ -334,6 +340,95 @@ private struct MonkCompletedView: View {
             .padding(.top, 16)
             .padding(.bottom, 24)
         }
+    }
+}
+
+/// "Seus 30 dias": um quadrado por dia, mais dias completos, recorde e tentativa.
+private struct MonkDaysGrid: View {
+    @Environment(Store.self) private var store
+
+    var body: some View {
+        let completed = store.monkCompletedDays
+        VStack(alignment: .leading, spacing: 14) {
+            SectionLabel(text: "Seus \(Store.monkDays) dias")
+            VStack(spacing: 8) {
+                ForEach(0..<(Store.monkDays / 6), id: \.self) { r in
+                    HStack(spacing: 8) {
+                        ForEach(1...6, id: \.self) { c in
+                            let n = r * 6 + c
+                            cell(n, store.monkDayState(n))
+                        }
+                    }
+                }
+            }
+            HStack(spacing: 14) {
+                legend(Theme.done, "Tudo feito")
+                legend(Theme.accent.opacity(0.35), "Segunda chance")
+                legend(Theme.accent, "Hoje", ring: true)
+            }
+            .font(.inter(13))
+            .foregroundStyle(Theme.muted)
+
+            HStack(spacing: 10) {
+                tile("\(completed)", completed == 1 ? "dia completo" : "dias completos", Theme.text)
+                tile("\(max(store.monkRecord, completed))", "seu recorde", Theme.accent)
+                tile("\(store.data.monk?.attempt ?? 1)ª", "tentativa", Theme.text)
+            }
+        }
+    }
+
+    private func cell(_ n: Int, _ state: Store.MonkDayState) -> some View {
+        let fill: Color
+        let textColor: Color
+        switch state {
+        case .done: fill = Theme.done; textColor = Theme.bg
+        case .forgiven: fill = Theme.accent.opacity(0.35); textColor = Theme.text
+        case .today: fill = Theme.card; textColor = Theme.text
+        case .missed: fill = Theme.track; textColor = Theme.muted
+        case .future: fill = Theme.card.opacity(0.6); textColor = Theme.muted.opacity(0.6)
+        }
+        return ZStack {
+            RoundedRectangle(cornerRadius: 10, style: .continuous).fill(fill)
+            if state == .today {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Theme.accent, lineWidth: 2)
+            }
+            Text("\(n)")
+                .font(.inter(14, .semibold))
+                .foregroundStyle(textColor)
+        }
+        .frame(maxWidth: .infinity)
+        .aspectRatio(1, contentMode: .fit)
+        .accessibilityLabel("Dia \(n)")
+    }
+
+    private func legend(_ color: Color, _ label: String, ring: Bool = false) -> some View {
+        HStack(spacing: 6) {
+            if ring {
+                RoundedRectangle(cornerRadius: 3).strokeBorder(color, lineWidth: 2).frame(width: 12, height: 12)
+            } else {
+                RoundedRectangle(cornerRadius: 3).fill(color).frame(width: 12, height: 12)
+            }
+            Text(label)
+        }
+    }
+
+    private func tile(_ value: String, _ label: String, _ color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value)
+                .font(.archivo(22, bold: true))
+                .foregroundStyle(color)
+            Text(label)
+                .font(.inter(12))
+                .foregroundStyle(Theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Theme.track, lineWidth: 1)
+        )
     }
 }
 

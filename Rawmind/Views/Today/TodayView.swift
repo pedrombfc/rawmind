@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-/// Tela "Hoje": rotina matinal (sempre), hábitos do Monk Mode (se ativo) e botão de foco.
+/// Tela "Hoje": tempo de tela ganho, rotina matinal, troca, cartão do Monk Mode e foco.
 struct TodayView: View {
     @Environment(Store.self) private var store
     var openMonk: () -> Void = {}
@@ -16,7 +16,7 @@ struct TodayView: View {
                     header
                     routineCard
                     swapCard
-                    habitsSection
+                    monkCard
                     statsRow
                     focusButton
                         .padding(.top, 8)
@@ -231,58 +231,65 @@ struct TodayView: View {
         return "Falta: " + missing.joined(separator: ", ")
     }
 
-    @ViewBuilder
-    private var habitsSection: some View {
-        if store.monkActive {
-            VStack(alignment: .leading, spacing: 8) {
-                let missing = store.monkHabits.count - store.monkDoneToday
-                SectionLabel(text: missing == 0 ? "Monk Mode · tudo feito hoje" : "Monk Mode · faltam \(missing) até meia-noite",
-                             color: missing == 0 ? Theme.done : Theme.muted)
-                ForEach(store.monkHabits) { habit in
-                    let done = store.isHabitDone(habit)
-                    Button {
-                        withAnimation(.snappy) { store.toggleHabit(habit) }
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    } label: {
-                        HStack(spacing: 12) {
-                            CheckBox(done: done, size: 24)
-                            Text(habit.title)
-                                .font(.inter(15))
-                                .foregroundStyle(done ? Theme.muted : Theme.text)
-                                .strikethrough(done, color: Theme.muted)
-                            Spacer(minLength: 0)
-                            Text(habit.sideText)
-                                .font(.inter(13))
-                                .foregroundStyle(Theme.muted)
+    /// Cartão do Monk Mode (abre a aba). Os hábitos em si ficam lá.
+    private var monkCard: some View {
+        Button(action: openMonk) {
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(monkTitle)
+                        .font(.archivo(19, bold: true))
+                        .foregroundStyle(Theme.text)
+                    Text(monkSubtitle)
+                        .font(.inter(14))
+                        .foregroundStyle(Theme.muted)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if store.monkActive {
+                        HStack(spacing: 5) {
+                            ForEach(store.monkHabits) { habit in
+                                Capsule()
+                                    .fill(store.isHabitDone(habit) ? Theme.done : Theme.track)
+                                    .frame(height: 5)
+                            }
                         }
-                        .card(padding: 14)
+                        .padding(.top, 6)
                     }
-                    .buttonStyle(.plain)
                 }
+                Spacer(minLength: 0)
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Theme.bg)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(Theme.accent))
             }
-        } else if !store.monkCompleted {
-            Button(action: openMonk) {
-                HStack(spacing: 14) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Monk Mode parado")
-                            .font(.archivo(19, bold: true))
-                            .foregroundStyle(Theme.text)
-                        Text("\(Store.monkDays) dias, \(Store.minHabits) hábitos ou mais, sem desculpa.")
-                            .font(.inter(14))
-                            .foregroundStyle(Theme.muted)
-                            .multilineTextAlignment(.leading)
-                    }
-                    Spacer(minLength: 0)
-                    Text("Iniciar")
-                        .font(.inter(15, .semibold))
-                        .foregroundStyle(Theme.accent)
-                    Image(systemName: "chevron.right")
-                        .foregroundStyle(Theme.accent)
-                }
-                .card(padding: 18, radius: 20)
-            }
-            .buttonStyle(.plain)
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.card)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(Theme.track, lineWidth: 1.5)
+            )
         }
+        .buttonStyle(.plain)
+    }
+
+    private var monkTitle: String {
+        if store.monkActive { return "Monk Mode · dia \(min(store.monkDay, Store.monkDays))" }
+        if store.monkCompleted { return "Monk Mode completo" }
+        return "Monk Mode parado"
+    }
+
+    private var monkSubtitle: String {
+        if store.monkActive {
+            let total = store.monkHabits.count
+            let missing = total - store.monkDoneToday
+            return missing <= 0
+                ? "Tudo feito hoje. Amanhã é o dia \(min(store.monkDay + 1, Store.monkDays))."
+                : "Faltam \(missing) de \(total) hábitos. Prazo: meia-noite."
+        }
+        if store.monkCompleted { return "30 dias feitos. Escreva o que mudou." }
+        return "\(Store.monkDays) dias, \(Store.minHabits) hábitos ou mais, sem desculpa."
     }
 
     private var statsRow: some View {

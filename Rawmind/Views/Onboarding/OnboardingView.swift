@@ -15,7 +15,7 @@ struct OnboardingView: View {
     @State private var instaM = 0
     @State private var skipBaseline = false
 
-    private let totalSteps = 6
+    private let totalSteps = 7
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,11 +29,12 @@ struct OnboardingView: View {
                     case 0: ManifestoStep()
                     case 1: BaselineStep(totalH: $screenH, totalM: $screenM, instaH: $instaH, instaM: $instaM) {
                         skipBaseline = true
-                        step += 1
+                        step += 2
                     }
-                    case 2: RoutineStep(selected: $routine)
-                    case 3: TimeStep(time: $wakeTime)
-                    case 4: AlternativesStep(selected: $alternatives)
+                    case 2: YearStep(minutesPerDay: screenH * 60 + screenM, instaPerDay: instaH * 60 + instaM)
+                    case 3: RoutineStep(selected: $routine)
+                    case 4: TimeStep(time: $wakeTime)
+                    case 5: AlternativesStep(selected: $alternatives)
                     default: CommitStep(
                         routineCount: routine.count,
                         timeText: timeText,
@@ -69,7 +70,8 @@ struct OnboardingView: View {
                     .font(.archivo(22))
             } else {
                 Button {
-                    step -= 1
+                    // Quem pulou o tempo de tela também pulou a conta dos dias por ano.
+                    step -= (step == 3 && skipBaseline) ? 2 : 1
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 20, weight: .semibold))
@@ -96,7 +98,7 @@ struct OnboardingView: View {
                     step += 1
                 }
                 .buttonStyle(PrimaryButtonStyle())
-                .disabled(step == 2 && routine.isEmpty)
+                .disabled(step == 3 && routine.isEmpty)
             } else {
                 HoldToCommitButton { finish() }
                 Text("Segure por 3 segundos para assinar")
@@ -109,6 +111,7 @@ struct OnboardingView: View {
     private var buttonTitle: String {
         switch step {
         case 0: return "Bora começar"
+        case 2: return "Quero esses dias de volta"
         default: return "Continuar"
         }
     }
@@ -312,6 +315,89 @@ private struct TimeStep: View {
                 .frame(maxWidth: .infinity)
                 .environment(\.locale, Locale(identifier: "pt_BR"))
         }
+    }
+}
+
+/// A conta: horas de celular por dia viram dias inteiros por ano.
+private struct YearStep: View {
+    let minutesPerDay: Int
+    let instaPerDay: Int
+
+    var body: some View {
+        let days = Store.daysPerYear(minutesPerDay)
+        let awake = Store.daysPerYear(minutesPerDay, hoursPerDay: 16)
+        let yearHours = minutesPerDay * 365 / 60
+        let back = minutesPerDay >= 120 ? 60 : max(minutesPerDay / 2, 1)
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Com \(Store.durationText(minutesPerDay)) por dia de celular, isso dá")
+                .font(.inter(15))
+                .foregroundStyle(Theme.muted)
+            Text("\(days) \(days == 1 ? "dia" : "dias")")
+                .font(.archivo(88))
+                .tracking(-3)
+                .foregroundStyle(Theme.accent)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            Text("por ano olhando pra tela.")
+                .font(.archivo(28))
+                .tracking(-0.5)
+                .fixedSize(horizontal: false, vertical: true)
+            (Text("\(yearHours.formatted(.number.locale(Locale(identifier: "pt_BR")))) horas por ano, divididas em dias de 24 horas. Contando só as horas em que você está acordado, são ")
+             + Text("\(awake) dias").font(.inter(15, .semibold)).foregroundColor(Theme.text)
+             + Text("."))
+                .font(.inter(15))
+                .foregroundStyle(Theme.muted)
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+
+            VStack(spacing: 0) {
+                row("Por semana", Store.durationText(minutesPerDay * 7))
+                Divider().overlay(Theme.track)
+                row("Só de Instagram", "\(Store.daysPerYear(instaPerDay)) dias por ano")
+                Divider().overlay(Theme.track)
+                row("Em 10 anos", tenYears)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 4)
+            .background(Theme.card)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Se o Rawmind te devolver só \(back >= 60 ? "1 hora" : Store.durationText(back)) por dia:")
+                    .font(.inter(16, .semibold))
+                    .foregroundStyle(Theme.done)
+                Text("são \(max(Store.daysPerYear(back), 1)) dias por ano de volta pra sua vida.")
+                    .font(.inter(15))
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.doneBg)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+    }
+
+    /// "1 ano e 9 meses", "8 meses", "2 anos".
+    private var tenYears: String {
+        let totalDays = Double(minutesPerDay) * 3650 / 1440
+        var years = Int(totalDays / 365)
+        var months = Int(((totalDays - Double(years) * 365) / 30.4).rounded())
+        if months == 12 { years += 1; months = 0 }
+        let y = years == 0 ? "" : (years == 1 ? "1 ano" : "\(years) anos")
+        let m = months == 0 ? "" : (months == 1 ? "1 mês" : "\(months) meses")
+        if y.isEmpty && m.isEmpty { return "menos de 1 mês" }
+        if y.isEmpty { return m }
+        if m.isEmpty { return y }
+        return "\(y) e \(m)"
+    }
+
+    private func row(_ label: String, _ value: String) -> some View {
+        HStack(spacing: 16) {
+            Text(label).foregroundStyle(Theme.muted)
+            Spacer()
+            Text(value).multilineTextAlignment(.trailing)
+        }
+        .font(.inter(15))
+        .padding(.vertical, 14)
     }
 }
 

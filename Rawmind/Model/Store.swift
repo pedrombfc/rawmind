@@ -338,6 +338,30 @@ final class Store {
         Notifications.scheduleMonkDeadlines(list)
     }
 
+    enum MonkDayState { case done, forgiven, today, future, missed }
+
+    /// Como foi o dia `n` do Monk Mode (para o calendário de 30 dias).
+    func monkDayState(_ n: Int) -> MonkDayState {
+        guard let run = data.monk,
+              let date = calendar.date(byAdding: .day, value: n - 1, to: calendar.startOfDay(for: run.startDate))
+        else { return .future }
+        let current = monkDay
+        if n > current { return .future }
+        let key = Store.key(for: date)
+        if run.forgivenDays.contains(key) { return .forgiven }
+        let done = data.days[key]?.habitsDone ?? []
+        let all = !run.habitIDs.isEmpty && run.habitIDs.allSatisfy { done.contains($0) }
+        if n == current { return all ? .done : .today }
+        return all ? .done : .missed
+    }
+
+    /// Dias do Monk Mode atual já completos (antes de hoje).
+    var monkCompletedDays: Int {
+        guard data.monk != nil else { return 0 }
+        if monkCompleted { return Store.monkDays }
+        return min(max(monkDay - 1, 0), Store.monkDays)
+    }
+
     /// Dias em que o hábito foi feito neste Monk Mode.
     func habitDoneDays(_ habit: Habit) -> Int {
         let from = data.monk.map { Store.key(for: $0.startDate) } ?? ""
@@ -609,7 +633,15 @@ final class Store {
         if mode == "fim", let yesterday = calendar.date(byAdding: .day, value: -1, to: today) {
             d.secondChancesUsed = [Store.monthKey(for: yesterday)]
         }
-        d.monk = MonkRun(startDate: start, habitIDs: ids, attempt: 2)
+        var run = MonkRun(startDate: start, habitIDs: ids, attempt: 2)
+        if mode == "ativo", let day7 = calendar.date(byAdding: .day, value: 6, to: start) {
+            // Dia 7 perdoado com a segunda chance.
+            let key = Store.key(for: day7)
+            d.days[key]?.habitsDone.remove(ids[4])
+            run.forgivenDays = [key]
+            d.secondChancesUsed = [Store.monthKey(for: day7)]
+        }
+        d.monk = run
         // Tempo de tela de exemplo: 4h10 antes, 2h30 na última semana anotada.
         var base = ScreenTimeEntry(totalMinutes: 250, instagramMinutes: 75)
         base.date = calendar.date(byAdding: .day, value: -21, to: today) ?? today

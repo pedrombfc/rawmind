@@ -64,6 +64,9 @@ struct RoutineView: View {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .strokeBorder(Theme.track, lineWidth: 1)
                 )
+
+                history
+                    .padding(.top, 8)
             }
             .padding(.horizontal, 20)
             .padding(.top, 8)
@@ -84,10 +87,128 @@ struct RoutineView: View {
         }
     }
 
+    /// Calendário da rotina: fase 1 (30 dias), depois fase 2 (até 66). 2 reservas por semana.
+    private var history: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            SectionLabel(text: store.phaseTarget == Store.phase1 ? "Seus dias · Fase 1 · 30 dias" : "Seus dias · Fase 2 · até 66 dias")
+
+            let statuses = store.statuses(upTo: store.phaseTarget)
+            let rowCount = (statuses.count + 5) / 6
+            VStack(spacing: 8) {
+                ForEach(0..<rowCount, id: \.self) { r in
+                    HStack(spacing: 8) {
+                        ForEach(0..<6, id: \.self) { c in
+                            let index = r * 6 + c
+                            if index < statuses.count {
+                                RoutineDayCell(day: index + 1, status: statuses[index])
+                            } else {
+                                Color.clear.frame(maxWidth: .infinity)
+                            }
+                        }
+                    }
+                }
+            }
+
+            HStack(spacing: 16) {
+                legendItem(Theme.done, "Feito")
+                legendItem(Theme.accent.opacity(0.35), "Reserva")
+                legendItem(Theme.track, "Perdido")
+            }
+            .font(.inter(13))
+            .foregroundStyle(Theme.muted)
+
+            HStack(spacing: 10) {
+                tile("\(store.completedDays)", "dias com a rotina feita")
+                tile("\(store.reservesLeftThisWeek)", "reservas nesta semana")
+                tile("\(store.totalFocusMinutes)", "min de foco")
+            }
+
+            Text("Essa sequência nunca zera. Errar um dia não apaga o que você já fez: o que conta é voltar.")
+                .font(.inter(14))
+                .foregroundStyle(Theme.muted)
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func legendItem(_ color: Color, _ label: String) -> some View {
+        HStack(spacing: 6) {
+            RoundedRectangle(cornerRadius: 3).fill(color).frame(width: 12, height: 12)
+            Text(label)
+        }
+    }
+
+    private func tile(_ value: String, _ label: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value).font(.archivo(22, bold: true))
+            Text(label)
+                .font(.inter(12))
+                .foregroundStyle(Theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Theme.track, lineWidth: 1)
+        )
+    }
+
     private var coachLine: String {
         let left = store.data.routine.count - store.routineDoneCount
         if left <= 0 { return "Rotina feita. O dia é seu." }
         if left == 1 { return "Falta 1. Termina isso." }
         return "Faltam \(left). Bora terminar."
+    }
+}
+
+/// Um dia no calendário da rotina (feito, reserva, perdido, hoje, futuro).
+struct RoutineDayCell: View {
+    let day: Int
+    let status: DayStatus
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(fill)
+            if status == .today {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Theme.accent, lineWidth: 2)
+            }
+            Text("\(day)")
+                .font(.inter(14, status == .done ? .semibold : .regular))
+                .foregroundStyle(textColor)
+        }
+        .frame(maxWidth: .infinity)
+        .aspectRatio(1, contentMode: .fit)
+        .accessibilityLabel("Dia \(day), \(label)")
+    }
+
+    private var fill: Color {
+        switch status {
+        case .done: return Theme.done
+        case .reserve: return Theme.accent.opacity(0.35)
+        case .missed: return Theme.track
+        case .today: return Theme.card
+        case .future: return Theme.card.opacity(0.6)
+        }
+    }
+
+    private var textColor: Color {
+        switch status {
+        case .done: return Theme.bg
+        case .future: return Theme.muted.opacity(0.6)
+        default: return Theme.text
+        }
+    }
+
+    private var label: String {
+        switch status {
+        case .done: return "feito"
+        case .reserve: return "dia de reserva"
+        case .missed: return "perdido"
+        case .today: return "hoje"
+        case .future: return "ainda não chegou"
+        }
     }
 }

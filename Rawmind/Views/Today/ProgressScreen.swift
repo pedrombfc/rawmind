@@ -1,11 +1,14 @@
 import SwiftUI
 
-/// Progresso: tempo de tela antes x agora, trocas da semana, caderno, Monk Mode e rotina.
+/// Progresso: estatísticas em cima (tempo de tela, trocas, caderno) e, embaixo,
+/// as atividades para fazer no lugar do celular.
 struct ProgressScreen: View {
     @Environment(Store.self) private var store
+    @State private var path: [MindKind] = []
+    @State private var showOther = false
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("Progresso")
@@ -46,11 +49,8 @@ struct ProgressScreen: View {
                     }
                     .buttonStyle(.plain)
 
-                    monkCard
-                        .padding(.top, 8)
-
-                    routineSection
-                        .padding(.top, 8)
+                    activities
+                        .padding(.top, 10)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
@@ -59,6 +59,17 @@ struct ProgressScreen: View {
             .foregroundStyle(Theme.text)
             .screenBackground()
             .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(for: MindKind.self) { kind in
+                if kind == .escrever {
+                    WriteView(onDone: { path.removeAll() })
+                } else {
+                    MindExerciseView(kind: kind, onDone: { path.removeAll() })
+                }
+            }
+        }
+        .sheet(isPresented: $showOther) {
+            NavigationStack { OtherSwapView() }
+                .presentationDetents([.medium, .large])
         }
     }
 
@@ -80,74 +91,76 @@ struct ProgressScreen: View {
         .card(padding: 18, radius: 20)
     }
 
-    // MARK: Monk Mode
+    // MARK: Em vez do celular
 
-    private var monkCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SectionLabel(text: "Monk Mode", color: Theme.accent)
-            HStack(spacing: 10) {
-                if store.monkActive {
-                    tile("Dia \(min(store.monkDay, Store.monkDays))", "de \(Store.monkDays)")
-                } else if store.monkCompleted {
-                    tile("\(Store.monkDays) ✓", "completo")
-                } else {
-                    tile("Parado", "na aba Monk Mode")
+    private static let activityKinds: [MindKind] = [.ler, .escrever, .pensar, .respirar, .meditar, .outro]
+
+    private var activities: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: "Em vez do celular", color: Theme.accent)
+            Text("Toque numa atividade pra começar. Fica registrado como uma troca.")
+                .font(.inter(14))
+                .foregroundStyle(Theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.bottom, 2)
+            let kinds = ProgressScreen.activityKinds
+            ForEach(0..<(kinds.count / 2), id: \.self) { row in
+                HStack(spacing: 10) {
+                    activityCard(kinds[row * 2])
+                    activityCard(kinds[row * 2 + 1])
                 }
-                tile("\(store.monkRecord)", store.monkRecord == 1 ? "dia de recorde" : "dias de recorde")
-                tile("\(store.monkAttempts)", store.monkAttempts == 1 ? "tentativa" : "tentativas")
             }
         }
     }
 
-    // MARK: Rotina matinal
-
-    private var routineSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            SectionLabel(text: store.phaseTarget == Store.phase1 ? "Rotina matinal · Fase 1 · 30 dias" : "Rotina matinal · Fase 2 · até 66 dias")
-
-            let statuses = store.statuses(upTo: store.phaseTarget)
-            let rowCount = (statuses.count + 5) / 6
-            VStack(spacing: 8) {
-                ForEach(0..<rowCount, id: \.self) { r in
-                    HStack(spacing: 8) {
-                        ForEach(0..<6, id: \.self) { c in
-                            let index = r * 6 + c
-                            if index < statuses.count {
-                                DayCell(day: index + 1, status: statuses[index])
-                            } else {
-                                Color.clear.frame(maxWidth: .infinity)
-                            }
-                        }
+    private func activityCard(_ kind: MindKind) -> some View {
+        let today = store.mindSessions(on: Date()).filter { $0.kind == kind }.count
+        return Button {
+            if kind == .outro {
+                showOther = true
+            } else {
+                path.append(kind)
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top) {
+                    Image(systemName: kind.icon)
+                        .font(.system(size: 19, weight: .medium))
+                        .frame(width: 44, height: 44)
+                        .background(Circle().fill(Theme.track))
+                    Spacer(minLength: 4)
+                    if today > 0 {
+                        Text("\(today)x hoje")
+                            .font(.inter(13, .semibold))
+                            .foregroundStyle(Theme.done)
                     }
                 }
+                Spacer(minLength: 0)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(kind == .pensar ? "Pensar" : kind.title)
+                        .font(.inter(16, .semibold))
+                    Text(activitySubtitle(kind))
+                        .font(.inter(13))
+                        .foregroundStyle(Theme.muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                }
             }
-
-            HStack(spacing: 16) {
-                legendItem(Theme.done, "Feito")
-                legendItem(Theme.accent.opacity(0.35), "Reserva")
-                legendItem(Theme.track, "Perdido")
-            }
-            .font(.inter(13))
-            .foregroundStyle(Theme.muted)
-
-            HStack(spacing: 10) {
-                tile("\(store.completedDays)", "dias com a rotina feita")
-                tile("\(store.reservesLeftThisWeek)", "reservas nesta semana")
-                tile("\(store.totalFocusMinutes)", "min de foco")
-            }
-
-            Text("A sequência nunca zera. Errar um dia não apaga o que você já fez: o que conta é voltar.")
-                .font(.inter(15))
-                .foregroundStyle(Theme.muted)
-                .lineSpacing(4)
-                .fixedSize(horizontal: false, vertical: true)
+            .foregroundStyle(Theme.text)
+            .padding(16)
+            .frame(maxWidth: .infinity, minHeight: 128, alignment: .topLeading)
+            .background(Theme.card)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 
-    private func legendItem(_ color: Color, _ label: String) -> some View {
-        HStack(spacing: 6) {
-            RoundedRectangle(cornerRadius: 3).fill(color).frame(width: 12, height: 12)
-            Text(label)
+    private func activitySubtitle(_ kind: MindKind) -> String {
+        switch kind {
+        case .outro: return "Registrar o que fez"
+        case .pensar: return "\(kind.defaultMinutes) min, sem tela"
+        default: return "\(kind.defaultMinutes) min"
         }
     }
 
@@ -200,52 +213,3 @@ private struct WeekBars: View {
     }
 }
 
-private struct DayCell: View {
-    let day: Int
-    let status: DayStatus
-
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(fill)
-            if status == .today {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(Theme.accent, lineWidth: 2)
-            }
-            Text("\(day)")
-                .font(.inter(14, status == .done ? .semibold : .regular))
-                .foregroundStyle(textColor)
-        }
-        .frame(maxWidth: .infinity)
-        .aspectRatio(1, contentMode: .fit)
-        .accessibilityLabel("Dia \(day), \(label)")
-    }
-
-    private var fill: Color {
-        switch status {
-        case .done: return Theme.done
-        case .reserve: return Theme.accent.opacity(0.35)
-        case .missed: return Theme.track
-        case .today: return Theme.card
-        case .future: return Theme.card.opacity(0.6)
-        }
-    }
-
-    private var textColor: Color {
-        switch status {
-        case .done: return Theme.bg
-        case .future: return Theme.muted.opacity(0.6)
-        default: return Theme.text
-        }
-    }
-
-    private var label: String {
-        switch status {
-        case .done: return "feito"
-        case .reserve: return "dia de reserva"
-        case .missed: return "perdido"
-        case .today: return "hoje"
-        case .future: return "ainda não chegou"
-        }
-    }
-}
