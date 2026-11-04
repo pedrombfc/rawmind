@@ -28,10 +28,17 @@ final class Store {
     static let phase1 = 30
     static let phase2 = 66
     static let reservesPerWeek = 2
-    static let maxHabits = 5
+    /// Monk Mode: 30 dias, de 5 a 10 hábitos.
+    static let monkDays = 30
+    static let minHabits = 5
+    static let maxHabits = 10
+    /// Lembrete do prazo (antes da meia-noite).
+    static let deadlineReminderHour = 22
 
     private(set) var data: AppData
     private let storageKey = "rawmind.data.v1"
+    /// Modo de demonstração (só no simulador): nada é salvo nem agendado.
+    private var isDemo = false
 
     init() {
         if let raw = UserDefaults.standard.data(forKey: storageKey),
@@ -40,6 +47,11 @@ final class Store {
         } else {
             data = AppData()
         }
+        #if DEBUG
+        if let mode = UserDefaults.standard.string(forKey: "demoMonk") {
+            seedDemo(mode)
+        }
+        #endif
     }
 
     // MARK: Gravar
@@ -50,6 +62,7 @@ final class Store {
     }
 
     private func save() {
+        guard !isDemo else { return }
         if let raw = try? JSONEncoder().encode(data) {
             UserDefaults.standard.set(raw, forKey: storageKey)
         }
@@ -71,6 +84,23 @@ final class Store {
     }
 
     var todayKey: String { Store.key(for: Date()) }
+
+    /// "aaaa-mm-dd" -> data.
+    static func date(fromKey key: String) -> Date? {
+        let parts = key.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3 else { return nil }
+        return Calendar.current.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))
+    }
+
+    /// "aaaa-mm" (para a segunda chance do mês).
+    static func monthKey(for date: Date) -> String {
+        let c = Calendar.current.dateComponents([.year, .month], from: date)
+        return String(format: "%04d-%02d", c.year ?? 0, c.month ?? 0)
+    }
+
+    private func daysBetween(_ a: Date, _ b: Date) -> Int {
+        calendar.dateComponents([.day], from: calendar.startOfDay(for: a), to: calendar.startOfDay(for: b)).day ?? 0
+    }
 
     var today: DayRecord { data.days[todayKey] ?? DayRecord() }
 
@@ -124,6 +154,7 @@ final class Store {
     }
 
     func toggleHabit(_ habit: Habit) {
+        guard monkActive else { return }
         let key = todayKey
         update { d in
             var rec = d.days[key] ?? DayRecord()
@@ -134,12 +165,183 @@ final class Store {
             }
             d.days[key] = rec
         }
+        evaluateMonk()
+        refreshMonkReminders()
     }
 
-    // MARK: Monk Mode (hábitos)
+    // MARK: Monk Mode (desafio)
 
+    /// Em andamento (ainda não completou os 30 dias).
+    var monkActive: Bool { data.monk != nil && data.monk?.completedAt == nil }
+
+    var monkCompleted: Bool { data.monk?.completedAt != nil }
+
+    /// Dia do Monk Mode (1 = primeiro dia).
+    var monkDay: Int {
+        guard let run = data.monk else { return 0 }
+        return daysBetween(run.startDate, Date()) + 1
+    }
+
+    /// Hábitos travados no Monk Mode atual.
+    var monkHabits: [Habit] {
+        guard let run = data.monk else { return [] }
+        return run.habitIDs.compactMap { id in data.habits.first { $0.id == id } }
+    }
+
+    var monkDoneToday: Int { monkHabits.filter { isHabitDone($0) }.count }
+
+    var monkAllDoneToday: Bool { !monkHabits.isEmpty && monkDoneToday == monkHabits.count }
+
+    /// Ainda tem a segunda chance do mês desta data?
+    func hasSecondChance(for date: Date = Date()) -> Bool {
+        !data.secondChancesUsed.contains(Store.monthKey(for: date))
+    }
+
+    /// Melhor tentativa (dias completos).
+    var monkRecord: Int { data.monkHistory.map(\.daysCompleted).max() ?? 0 }
+
+    var monkAttempts: Int { data.monkHistory.count + (monkActive ? 1 : 0) }
+
+    /// Fim do prazo de hoje (meia-noite).
+    var midnight: Date {
+        calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: Date())) ?? Date()
+    }
+
+    func startMonk(with habits: [Habit]) {
+        for old in data.habits where !habits.contains(where: { $0.id == old.id }) {
+            Notifications.cancelHabit(old)
+        }
+        let attempt = data.monkHistory.count + 1
+        let start = calendar.startOfDay(for: Date())
+        update { d in
+            d.habits = habits
+            d.monk = MonkRun(startDate: start, habitIDs: habits.map(\.id), attempt: attempt)
+        }
+        if !isDemo { habits.forEach { Notifications.scheduleHabit($0) } }
+        refreshMonkReminders()
+    }
+
+    /// Confere os dias que já acabaram. Se faltou hábito, guarda a falha para a pessoa decidir.
+    func evaluateMonk() {
+        guard var run = data.monk, run.completedAt == nil, run.failure == nil else { return }
+        let start = calendar.startOfDay(for: run.startDate)
+        let todayNumber = daysBetween(start, Date()) + 1
+        var day = 1
+        if let k = run.checkedThrough, let checked = Store.date(fromKey: k) {
+            day = daysBetween(start, checked) + 2
+        }
+        let before = run
+        while day < todayNumber && day <= Store.monkDays {
+            guard let date = calendar.date(byAdding: .day, value: day - 1, to: start) else { break }
+            let key = Store.key(for: date)
+            let done = data.days[key]?.habitsDone ?? []
+            let missing = run.habitIDs.filter { !done.contains($0) }
+            if missing.isEmpty || run.forgivenDays.contains(key) {
+                run.checkedThrough = key
+                day += 1
+            } else {
+                run.failure = MonkFailure(dayKey: key, dayNumber: day, missing: missing)
+                break
+            }
+        }
+        // Completo: os 30 dias passaram, ou o dia 30 já está todo marcado.
+        var completed = false
+        if run.failure == nil {
+            if day > Store.monkDays {
+                completed = true
+            } else if day == Store.monkDays && todayNumber == Store.monkDays {
+                let done = data.days[todayKey]?.habitsDone ?? []
+                completed = !run.habitIDs.isEmpty && run.habitIDs.allSatisfy { done.contains($0) }
+            }
+        }
+        if completed { run.completedAt = Date() }
+        guard run != before else { return }
+        let finished = run
+        update { d in
+            d.monk = finished
+            if completed {
+                d.monkHistory.append(MonkAttempt(startDate: finished.startDate, daysCompleted: Store.monkDays, end: .completed))
+            }
+        }
+        refreshMonkReminders()
+    }
+
+    /// Perdoa o dia que falhou (uma vez por mês).
+    func useSecondChance() {
+        guard let f = data.monk?.failure,
+              let date = Store.date(fromKey: f.dayKey),
+              hasSecondChance(for: date) else { return }
+        update { d in
+            d.secondChancesUsed.append(Store.monthKey(for: date))
+            d.monk?.forgivenDays.append(f.dayKey)
+            d.monk?.failure = nil
+        }
+        evaluateMonk()
+        refreshMonkReminders()
+    }
+
+    /// Aceita a falha: o Monk Mode acaba. Pode recomeçar na hora com os mesmos hábitos.
+    func acceptMonkFailure(restart: Bool) {
+        guard let run = data.monk, let f = run.failure else { return }
+        let habits = monkHabits
+        update { d in
+            d.monkHistory.append(MonkAttempt(startDate: run.startDate, daysCompleted: max(f.dayNumber - 1, 0), end: .failed))
+            d.monk = nil
+        }
+        if restart {
+            startMonk(with: habits)
+        } else {
+            stopMonkNotifications()
+        }
+    }
+
+    /// Desistir pelo Ajustes.
+    func quitMonk() {
+        guard let run = data.monk else { return }
+        let days = min(max(monkDay - 1, 0), Store.monkDays)
+        update { d in
+            if run.completedAt == nil {
+                d.monkHistory.append(MonkAttempt(startDate: run.startDate, daysCompleted: days, end: .quit))
+            }
+            d.monk = nil
+        }
+        stopMonkNotifications()
+    }
+
+    private func stopMonkNotifications() {
+        guard !isDemo else { return }
+        data.habits.forEach { Notifications.cancelHabit($0) }
+        Notifications.scheduleMonkDeadlines([])
+    }
+
+    /// Lembrete às 22h de cada dia que ainda falta (hoje some quando tudo está marcado).
+    func refreshMonkReminders() {
+        guard !isDemo else { return }
+        guard let run = data.monk, monkActive, run.failure == nil else {
+            Notifications.scheduleMonkDeadlines([])
+            return
+        }
+        let start = calendar.startOfDay(for: run.startDate)
+        var list: [(date: Date, day: Int)] = []
+        let first = max(monkDay, 1)
+        guard first <= Store.monkDays else {
+            Notifications.scheduleMonkDeadlines([])
+            return
+        }
+        for day in first...Store.monkDays {
+            guard let base = calendar.date(byAdding: .day, value: day - 1, to: start),
+                  let fire = calendar.date(bySettingHour: Store.deadlineReminderHour, minute: 0, second: 0, of: base),
+                  fire > Date() else { continue }
+            if day == monkDay && monkAllDoneToday { continue }
+            list.append((date: fire, day: day))
+        }
+        Notifications.scheduleMonkDeadlines(list)
+    }
+
+    /// Dias em que o hábito foi feito neste Monk Mode.
     func habitDoneDays(_ habit: Habit) -> Int {
-        data.days.values.filter { $0.habitsDone.contains(habit.id) }.count
+        let from = data.monk.map { Store.key(for: $0.startDate) } ?? ""
+        return data.days.filter { $0.key >= from && $0.value.habitsDone.contains(habit.id) }.count
     }
 
     func isHabitDone(_ habit: Habit, on date: Date) -> Bool {
@@ -210,7 +412,7 @@ final class Store {
         update { $0.conclusions[habit.id.uuidString] = conclusion }
     }
 
-    var canAddHabit: Bool { data.habits.count < Store.maxHabits }
+    var canAddHabit: Bool { !monkActive && data.habits.count < Store.maxHabits }
 
     // MARK: Trocas (mente)
 
@@ -358,4 +560,45 @@ final class Store {
     var routineTimeText: String {
         String(format: "%d:%02d", data.routineHour, data.routineMinute)
     }
+
+    #if DEBUG
+    /// Para tirar prints no simulador: abrir o app com `-demoMonk ativo`, `falha` ou `fim`.
+    /// Usa dados de exemplo só na memória; os dados reais do celular não mudam.
+    private func seedDemo(_ mode: String) {
+        isDemo = true
+        let today = calendar.startOfDay(for: Date())
+        let titles = ["Treinar", "Ler 10 páginas", "Beber 2L de água", "Sem redes antes do meio-dia", "Dormir antes da meia-noite"]
+        var habits = titles.compactMap { t in Library.habits.first { $0.title == t } }
+        if let i = habits.firstIndex(where: { $0.title == "Dormir antes da meia-noite" }) {
+            habits[i].reminders = [HabitReminder(hour: 23, minute: 30)]
+        }
+        let ids = habits.map(\.id)
+        let todayNumber = mode == "ativo" ? 12 : 13
+        let start = calendar.date(byAdding: .day, value: -(todayNumber - 1), to: today) ?? today
+        var d = data
+        d.onboarded = true
+        if d.startDate == nil { d.startDate = calendar.date(byAdding: .day, value: -20, to: today) }
+        if d.routine.isEmpty { d.routine = Array(Library.routine.prefix(3)) }
+        d.habits = habits
+        for n in 1..<todayNumber {
+            guard let date = calendar.date(byAdding: .day, value: n - 1, to: start) else { continue }
+            let key = Store.key(for: date)
+            var rec = d.days[key] ?? DayRecord()
+            rec.habitsDone = Set(ids)
+            if mode != "ativo" && n == todayNumber - 1 { rec.habitsDone.remove(ids[3]) }
+            d.days[key] = rec
+        }
+        var rec = d.days[Store.key(for: today)] ?? DayRecord()
+        rec.habitsDone = mode == "ativo" ? Set(ids.prefix(3)) : []
+        d.days[Store.key(for: today)] = rec
+        let previous = calendar.date(byAdding: .day, value: -45, to: today) ?? today
+        d.monkHistory = [MonkAttempt(startDate: previous, daysCompleted: 12, end: .failed)]
+        d.secondChancesUsed = []
+        if mode == "fim", let yesterday = calendar.date(byAdding: .day, value: -1, to: today) {
+            d.secondChancesUsed = [Store.monthKey(for: yesterday)]
+        }
+        d.monk = MonkRun(startDate: start, habitIDs: ids, attempt: 2)
+        data = d
+    }
+    #endif
 }

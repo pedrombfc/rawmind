@@ -4,6 +4,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(Store.self) private var store
     @State private var confirmReset = false
+    @State private var confirmQuit = false
 
     var body: some View {
         NavigationStack {
@@ -28,9 +29,23 @@ struct SettingsView: View {
                 }
                 .listRowBackground(Theme.card)
 
+                if let run = store.data.monk {
+                    Section {
+                        row("Monk Mode começou", PTDate.short(run.startDate))
+                        if store.monkActive {
+                            Button("Encerrar Monk Mode", role: .destructive) { confirmQuit = true }
+                        }
+                    } header: {
+                        Text("Monk Mode")
+                    } footer: {
+                        Text("Encerrar conta como uma tentativa. Você pode começar outro quando quiser.")
+                    }
+                    .listRowBackground(Theme.card)
+                }
+
                 Section {
                     if let start = store.data.startDate {
-                        row("Protocolo começou", PTDate.short(start))
+                        row("Rotina desde", PTDate.short(start))
                     }
                     Button("Recomeçar do zero", role: .destructive) { confirmReset = true }
                 } footer: {
@@ -42,6 +57,12 @@ struct SettingsView: View {
             .scrollContentBackground(.hidden)
             .screenBackground()
             .navigationTitle("Ajustes")
+            .confirmationDialog("Encerrar o Monk Mode?", isPresented: $confirmQuit, titleVisibility: .visible) {
+                Button("Encerrar", role: .destructive) { store.quitMonk() }
+                Button("Continuar no Monk Mode", role: .cancel) {}
+            } message: {
+                Text("Você volta pro começo. Seu histórico de hábitos fica guardado.")
+            }
             .confirmationDialog("Recomeçar do zero?", isPresented: $confirmReset, titleVisibility: .visible) {
                 Button("Apagar e recomeçar", role: .destructive) { store.reset() }
                 Button("Cancelar", role: .cancel) {}

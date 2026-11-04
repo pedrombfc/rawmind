@@ -1,14 +1,13 @@
 import SwiftUI
 import UIKit
 
-/// Primeira vez no app: 6 passos até "assinar" o protocolo.
+/// Primeira vez no app: 6 passos até "assinar" a rotina. O Monk Mode começa depois, na aba dele.
 struct OnboardingView: View {
     @Environment(Store.self) private var store
 
     @State private var step = 0
     @State private var routine: [RoutineItem] = Array(Library.routine.prefix(3))
     @State private var wakeTime: Date = Calendar.current.date(bySettingHour: 7, minute: 0, second: 0, of: Date()) ?? Date()
-    @State private var habits: [Habit] = []
     @State private var alternatives: [String] = ["ler uma página"]
     @State private var screenH = 4
     @State private var screenM = 0
@@ -16,7 +15,7 @@ struct OnboardingView: View {
     @State private var instaM = 0
     @State private var skipBaseline = false
 
-    private let totalSteps = 7
+    private let totalSteps = 6
 
     var body: some View {
         VStack(spacing: 0) {
@@ -34,12 +33,10 @@ struct OnboardingView: View {
                     }
                     case 2: RoutineStep(selected: $routine)
                     case 3: TimeStep(time: $wakeTime)
-                    case 4: HabitsStep(selected: $habits)
-                    case 5: AlternativesStep(selected: $alternatives)
+                    case 4: AlternativesStep(selected: $alternatives)
                     default: CommitStep(
                         routineCount: routine.count,
                         timeText: timeText,
-                        habitCount: habits.count,
                         alternative: alternatives.first ?? "—"
                     )
                     }
@@ -112,7 +109,6 @@ struct OnboardingView: View {
     private var buttonTitle: String {
         switch step {
         case 0: return "Bora começar"
-        case 4: return habits.isEmpty ? "Pular por agora" : "Continuar"
         default: return "Continuar"
         }
     }
@@ -127,7 +123,6 @@ struct OnboardingView: View {
         let hour = c.hour ?? 7
         let minute = c.minute ?? 0
         let chosenRoutine = routine
-        let chosenHabits = habits
         let chosenAlternatives = alternatives
         let baseline: ScreenTimeEntry? = skipBaseline ? nil : ScreenTimeEntry(totalMinutes: screenH * 60 + screenM, instagramMinutes: instaH * 60 + instaM)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -135,7 +130,6 @@ struct OnboardingView: View {
             d.routine = chosenRoutine
             d.routineHour = hour
             d.routineMinute = minute
-            d.habits = chosenHabits
             d.alternatives = chosenAlternatives
             if let baseline { d.screenBaseline = baseline }
             d.startDate = Calendar.current.startOfDay(for: Date())
@@ -321,45 +315,6 @@ private struct TimeStep: View {
     }
 }
 
-private struct HabitsStep: View {
-    @Binding var selected: [Habit]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            StepTitle(
-                title: "Quais hábitos entram no seu Monk Mode?",
-                subtitle: "Opcional, até \(Store.maxHabits). Poucos e firmes. Dá pra mudar depois na aba Monk Mode."
-            )
-            VStack(spacing: 8) {
-                ForEach(Library.habits) { habit in
-                    let on = selected.contains { $0.id == habit.id }
-                    Button {
-                        if let i = selected.firstIndex(where: { $0.id == habit.id }) {
-                            selected.remove(at: i)
-                        } else if selected.count < Store.maxHabits {
-                            selected.append(habit)
-                        }
-                    } label: {
-                        HStack(spacing: 14) {
-                            CheckBox(done: on, size: 26)
-                            Text(habit.title)
-                                .font(.inter(16, .medium))
-                                .foregroundStyle(Theme.text)
-                            Spacer(minLength: 0)
-                            Text(habit.sideText)
-                                .font(.inter(13))
-                                .foregroundStyle(Theme.muted)
-                        }
-                        .card(padding: 14)
-                        .opacity(on || selected.count < Store.maxHabits ? 1 : 0.45)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-}
-
 private struct AlternativesStep: View {
     @Binding var selected: [String]
 
@@ -398,7 +353,6 @@ private struct AlternativesStep: View {
 private struct CommitStep: View {
     let routineCount: Int
     let timeText: String
-    let habitCount: Int
     let alternative: String
 
     var body: some View {
@@ -409,7 +363,7 @@ private struct CommitStep: View {
                 Divider().overlay(Theme.track)
                 row("Rotina matinal", "\(routineCount) \(routineCount == 1 ? "item" : "itens"), às \(timeText)")
                 Divider().overlay(Theme.track)
-                row("Hábitos do dia", habitCount == 0 ? "nenhum por enquanto" : "\(habitCount)")
+                row("Monk Mode", "quando você quiser")
                 Divider().overlay(Theme.track)
                 row("Em vez de abrir", alternative)
                 Divider().overlay(Theme.track)

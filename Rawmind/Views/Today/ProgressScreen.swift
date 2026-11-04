@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Progresso: tempo de tela antes x agora, trocas da semana, caderno e Monk Mode.
+/// Progresso: tempo de tela antes x agora, trocas da semana, caderno, Monk Mode e rotina.
 struct ProgressScreen: View {
     @Environment(Store.self) private var store
 
@@ -46,7 +46,10 @@ struct ProgressScreen: View {
                     }
                     .buttonStyle(.plain)
 
-                    monkSection
+                    monkCard
+                        .padding(.top, 8)
+
+                    routineSection
                         .padding(.top, 8)
                 }
                 .padding(.horizontal, 20)
@@ -79,9 +82,28 @@ struct ProgressScreen: View {
 
     // MARK: Monk Mode
 
-    private var monkSection: some View {
+    private var monkCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionLabel(text: "Monk Mode", color: Theme.accent)
+            HStack(spacing: 10) {
+                if store.monkActive {
+                    tile("Dia \(min(store.monkDay, Store.monkDays))", "de \(Store.monkDays)")
+                } else if store.monkCompleted {
+                    tile("\(Store.monkDays) ✓", "completo")
+                } else {
+                    tile("Parado", "na aba Monk Mode")
+                }
+                tile("\(store.monkRecord)", store.monkRecord == 1 ? "dia de recorde" : "dias de recorde")
+                tile("\(store.monkAttempts)", store.monkAttempts == 1 ? "tentativa" : "tentativas")
+            }
+        }
+    }
+
+    // MARK: Rotina matinal
+
+    private var routineSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            SectionLabel(text: store.phaseTarget == Store.phase1 ? "Monk Mode · Fase 1 · 30 dias" : "Monk Mode · Fase 2 · até 66 dias")
+            SectionLabel(text: store.phaseTarget == Store.phase1 ? "Rotina matinal · Fase 1 · 30 dias" : "Rotina matinal · Fase 2 · até 66 dias")
 
             let statuses = store.statuses(upTo: store.phaseTarget)
             let rowCount = (statuses.count + 5) / 6
@@ -109,7 +131,7 @@ struct ProgressScreen: View {
             .foregroundStyle(Theme.muted)
 
             HStack(spacing: 10) {
-                tile("\(store.completedDays)", "dias completos")
+                tile("\(store.completedDays)", "dias com a rotina feita")
                 tile("\(store.reservesLeftThisWeek)", "reservas nesta semana")
                 tile("\(store.totalFocusMinutes)", "min de foco")
             }

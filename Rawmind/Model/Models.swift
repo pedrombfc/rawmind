@@ -44,7 +44,7 @@ enum HabitIcons {
     ]
 }
 
-/// Um hábito do Monk Mode (ex.: "Ler 10 páginas").
+/// Um hábito do Monk Mode (ex.: "Ler 10 páginas"). Todo dia, durante os 30 dias.
 struct Habit: Codable, Identifiable, Hashable {
     var id: UUID = UUID()
     var title: String
@@ -185,6 +185,12 @@ struct AppData: Codable {
     var screenBaseline: ScreenTimeEntry? = nil
     /// Registros semanais depois de começar.
     var screenEntries: [ScreenTimeEntry] = []
+    /// Monk Mode em andamento (nil = parado).
+    var monk: MonkRun? = nil
+    /// Tentativas que já acabaram.
+    var monkHistory: [MonkAttempt] = []
+    /// Meses ("aaaa-mm") em que a segunda chance já foi usada.
+    var secondChancesUsed: [String] = []
 
     init() {}
 
@@ -202,6 +208,77 @@ struct AppData: Codable {
         mindSessions = try c.decodeIfPresent([MindSession].self, forKey: .mindSessions) ?? []
         screenBaseline = try c.decodeIfPresent(ScreenTimeEntry.self, forKey: .screenBaseline)
         screenEntries = try c.decodeIfPresent([ScreenTimeEntry].self, forKey: .screenEntries) ?? []
+        monk = try c.decodeIfPresent(MonkRun.self, forKey: .monk)
+        monkHistory = try c.decodeIfPresent([MonkAttempt].self, forKey: .monkHistory) ?? []
+        secondChancesUsed = try c.decodeIfPresent([String].self, forKey: .secondChancesUsed) ?? []
+    }
+}
+
+/// Um Monk Mode em andamento: 30 dias, todos os hábitos, todo dia.
+struct MonkRun: Codable, Hashable {
+    var startDate: Date
+    /// Hábitos travados neste Monk Mode.
+    var habitIDs: [UUID]
+    var attempt: Int = 1
+    /// Dias perdoados com a segunda chance ("aaaa-mm-dd").
+    var forgivenDays: [String] = []
+    /// Último dia já conferido e aprovado ("aaaa-mm-dd").
+    var checkedThrough: String? = nil
+    /// Dia que falhou e ainda espera a decisão da pessoa.
+    var failure: MonkFailure? = nil
+    /// Quando os 30 dias foram completados.
+    var completedAt: Date? = nil
+
+    init(startDate: Date, habitIDs: [UUID], attempt: Int) {
+        self.startDate = startDate
+        self.habitIDs = habitIDs
+        self.attempt = attempt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        startDate = try c.decodeIfPresent(Date.self, forKey: .startDate) ?? Date()
+        habitIDs = try c.decodeIfPresent([UUID].self, forKey: .habitIDs) ?? []
+        attempt = try c.decodeIfPresent(Int.self, forKey: .attempt) ?? 1
+        forgivenDays = try c.decodeIfPresent([String].self, forKey: .forgivenDays) ?? []
+        checkedThrough = try c.decodeIfPresent(String.self, forKey: .checkedThrough)
+        failure = try c.decodeIfPresent(MonkFailure.self, forKey: .failure)
+        completedAt = try c.decodeIfPresent(Date.self, forKey: .completedAt)
+    }
+}
+
+/// Um dia em que faltou hábito.
+struct MonkFailure: Codable, Hashable {
+    var dayKey: String
+    var dayNumber: Int
+    var missing: [UUID]
+}
+
+enum MonkEnd: String, Codable {
+    case completed, failed, quit
+}
+
+/// Uma tentativa de Monk Mode que já acabou.
+struct MonkAttempt: Codable, Hashable, Identifiable {
+    var id: UUID = UUID()
+    var startDate: Date
+    var endDate: Date = Date()
+    var daysCompleted: Int
+    var end: MonkEnd
+
+    init(startDate: Date, daysCompleted: Int, end: MonkEnd) {
+        self.startDate = startDate
+        self.daysCompleted = daysCompleted
+        self.end = end
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        startDate = try c.decodeIfPresent(Date.self, forKey: .startDate) ?? Date()
+        endDate = try c.decodeIfPresent(Date.self, forKey: .endDate) ?? Date()
+        daysCompleted = try c.decodeIfPresent(Int.self, forKey: .daysCompleted) ?? 0
+        end = try c.decodeIfPresent(MonkEnd.self, forKey: .end) ?? .failed
     }
 }
 

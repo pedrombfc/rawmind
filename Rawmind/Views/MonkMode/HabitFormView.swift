@@ -5,6 +5,8 @@ struct HabitFormView: View {
     @Environment(Store.self) private var store
     @Environment(\.dismiss) private var dismiss
     let existing: Habit?
+    /// Usado ao iniciar o Monk Mode: devolve o hábito novo em vez de salvar.
+    var onCreate: ((Habit) -> Void)? = nil
 
     @State private var title = ""
     @State private var why = ""
@@ -13,6 +15,9 @@ struct HabitFormView: View {
     @State private var reminders: [HabitReminder] = []
     @State private var showIcons = false
     @State private var loaded = false
+
+    /// Durante o Monk Mode o nome e o tipo ficam travados.
+    private var locked: Bool { existing != nil && store.monkActive }
 
     var body: some View {
         Form {
@@ -53,12 +58,15 @@ struct HabitFormView: View {
                     Text("Evitar").tag(true)
                 }
                 .pickerStyle(.segmented)
+                .disabled(locked)
                 TextField(avoid ? "Ex.: Sem redes antes do meio-dia" : "Ex.: Ler 10 páginas", text: $title)
+                    .disabled(locked)
+                    .foregroundStyle(locked ? Theme.muted : Theme.text)
             } header: {
                 Text("Nome")
             } footer: {
                 VStack(alignment: .leading, spacing: 10) {
-                    if existing == nil && !suggestions.isEmpty {
+                    if existing == nil && onCreate == nil && !suggestions.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
                                 ForEach(suggestions) { s in
@@ -76,9 +84,13 @@ struct HabitFormView: View {
                             }
                         }
                     }
-                    Text(avoid
-                         ? "Todo dia, durante os 30 dias do Monk Mode. À noite você confirma: \"hoje eu me mantive\"."
-                         : "Todo dia, durante os 30 dias do Monk Mode.")
+                    if locked {
+                        Text("O nome fica travado até o fim do Monk Mode.")
+                    } else {
+                        Text(avoid
+                             ? "Todo dia, durante os 30 dias do Monk Mode. À noite você confirma: \"hoje eu me mantive\"."
+                             : "Todo dia, durante os 30 dias do Monk Mode.")
+                    }
                 }
                 .padding(.top, 4)
             }
@@ -188,6 +200,11 @@ struct HabitFormView: View {
         h.perWeek = 7
         h.icon = icon
         h.reminders = Array(reminders.prefix(2))
+        if existing == nil, let onCreate {
+            onCreate(h)
+            dismiss()
+            return
+        }
         if existing == nil && !store.canAddHabit {
             dismiss()
             return

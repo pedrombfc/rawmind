@@ -32,7 +32,9 @@ struct HabitDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button("Editar", systemImage: "pencil") { editing = true }
-                    Button("Apagar hábito", systemImage: "trash", role: .destructive) { confirmDelete = true }
+                    if !store.monkActive {
+                        Button("Apagar hábito", systemImage: "trash", role: .destructive) { confirmDelete = true }
+                    }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -76,7 +78,9 @@ struct HabitDetailView: View {
                     Text(habit.title)
                         .font(.archivo(28))
                         .multilineTextAlignment(.center)
-                    Text("Dia \(min(store.dayNumber, store.phaseTarget)) de \(Store.phase1) · \(habit.frequencyText)")
+                    Text(store.monkCompleted
+                         ? "\(Store.monkDays) de \(Store.monkDays) · Monk Mode completo"
+                         : "Dia \(min(max(store.monkDay, 1), Store.monkDays)) de \(Store.monkDays) · \(habit.frequencyText)")
                         .font(.inter(15))
                         .foregroundStyle(Theme.muted)
                 }
@@ -146,26 +150,28 @@ struct HabitDetailView: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge: .bottom) {
-            Button {
-                store.toggleHabit(habit)
-                UINotificationFeedbackGenerator().notificationOccurred(doneToday ? .warning : .success)
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: doneToday ? "checkmark.circle.fill" : "checkmark")
-                    Text(doneToday ? (habit.avoid ? "Hoje eu me mantive ✓" : "Feito hoje ✓") : (habit.avoid ? "Hoje eu me mantive" : "Feito hoje"))
-                }
-                .font(.archivo(19, bold: true))
-                .foregroundStyle(doneToday ? Theme.done : Theme.bg)
-                .frame(maxWidth: .infinity)
-                .frame(height: 60)
-                .background(doneToday ? Theme.doneBg : Theme.accent)
-                .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+            if store.monkActive {
+                Button {
+                    store.toggleHabit(habit)
+                    UINotificationFeedbackGenerator().notificationOccurred(doneToday ? .warning : .success)
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: doneToday ? "checkmark.circle.fill" : "checkmark")
+                        Text(doneToday ? (habit.avoid ? "Hoje eu me mantive ✓" : "Feito hoje ✓") : (habit.avoid ? "Hoje eu me mantive" : "Feito hoje"))
+                    }
+                    .font(.archivo(19, bold: true))
+                    .foregroundStyle(doneToday ? Theme.done : Theme.bg)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 60)
+                    .background(doneToday ? Theme.doneBg : Theme.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 20)
             .padding(.top, 10)
             .padding(.bottom, 8)
             .background(Theme.bg)
+            }
         }
     }
 
@@ -181,14 +187,14 @@ struct HabitDetailView: View {
             }
             .card(padding: 18, radius: 20)
         } else {
-            let ready = store.dayNumber >= Store.phase1
+            let ready = store.monkCompleted || store.monkDay >= Store.monkDays
             Button {
                 concluding = true
             } label: {
                 VStack(spacing: 4) {
                     Label("Escrever conclusão", systemImage: "square.and.pencil")
                         .font(.archivo(17, bold: true))
-                    Text(ready ? "Os 30 dias acabaram. O que mudou?" : "Liberada no dia 30 (faltam \(Store.phase1 - store.dayNumber))")
+                    Text(ready ? "Os 30 dias acabaram. O que mudou?" : "Liberada no dia 30 (faltam \(Store.monkDays - store.monkDay))")
                         .font(.inter(13))
                         .foregroundStyle(Theme.muted)
                 }
@@ -279,8 +285,8 @@ struct MonthCalendar: View {
     private func state(for date: Date) -> DotState {
         let day = calendar.startOfDay(for: date)
         let today = calendar.startOfDay(for: Date())
-        let start = store.data.startDate.map { calendar.startOfDay(for: $0) } ?? today
-        let end = calendar.date(byAdding: .day, value: Store.phase2 - 1, to: start) ?? today
+        let start = (store.data.monk?.startDate ?? store.data.startDate).map { calendar.startOfDay(for: $0) } ?? today
+        let end = calendar.date(byAdding: .day, value: Store.monkDays - 1, to: start) ?? today
         if store.isHabitDone(habit, on: day) { return .done }
         if day == today { return .today }
         if day < start || day > end { return .outside }

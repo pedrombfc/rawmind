@@ -1,9 +1,10 @@
 import SwiftUI
 import UIKit
 
-/// Tela "Hoje": dia do protocolo, rotina matinal, hábitos e botão de foco.
+/// Tela "Hoje": rotina matinal (sempre), hábitos do Monk Mode (se ativo) e botão de foco.
 struct TodayView: View {
     @Environment(Store.self) private var store
+    var openMonk: () -> Void = {}
     @State private var showFocus = false
     @State private var showSwap = false
 
@@ -12,7 +13,9 @@ struct TodayView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     header
-                    ThinBar(value: Double(min(store.dayNumber, store.phaseTarget)) / Double(store.phaseTarget))
+                    if store.monkActive {
+                        ThinBar(value: Double(min(store.monkDay, Store.monkDays)) / Double(Store.monkDays))
+                    }
                     routineCard
                     swapCard
                     habitsSection
@@ -46,10 +49,16 @@ struct TodayView: View {
                 Text(PTDate.long(Date()))
                     .font(.inter(14))
                     .foregroundStyle(Theme.muted)
-                (Text("Dia \(store.dayNumber)").foregroundColor(Theme.text)
-                 + Text(" de \(store.phaseTarget)").font(.archivo(20)).foregroundColor(Theme.muted))
-                    .font(.archivo(40))
-                    .tracking(-0.8)
+                Group {
+                    if store.monkActive {
+                        (Text("Dia \(min(store.monkDay, Store.monkDays))").foregroundColor(Theme.text)
+                         + Text(" de \(Store.monkDays)").font(.archivo(20)).foregroundColor(Theme.muted))
+                    } else {
+                        Text("Hoje")
+                    }
+                }
+                .font(.archivo(40))
+                .tracking(-0.8)
             }
             Spacer()
             HStack(spacing: 6) {
@@ -135,15 +144,12 @@ struct TodayView: View {
 
     @ViewBuilder
     private var habitsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SectionLabel(text: "Seus hábitos de hoje")
-            if store.data.habits.isEmpty {
-                Text("Nenhum hábito ainda. Crie os seus na aba Monk Mode.")
-                    .font(.inter(14))
-                    .foregroundStyle(Theme.muted)
-                    .padding(.vertical, 4)
-            } else {
-                ForEach(store.data.habits) { habit in
+        if store.monkActive {
+            VStack(alignment: .leading, spacing: 8) {
+                let missing = store.monkHabits.count - store.monkDoneToday
+                SectionLabel(text: missing == 0 ? "Monk Mode · tudo feito hoje" : "Monk Mode · faltam \(missing) até meia-noite",
+                             color: missing == 0 ? Theme.done : Theme.muted)
+                ForEach(store.monkHabits) { habit in
                     let done = store.isHabitDone(habit)
                     Button {
                         withAnimation(.snappy) { store.toggleHabit(habit) }
@@ -165,6 +171,28 @@ struct TodayView: View {
                     .buttonStyle(.plain)
                 }
             }
+        } else if !store.monkCompleted {
+            Button(action: openMonk) {
+                HStack(spacing: 14) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Monk Mode parado")
+                            .font(.archivo(19, bold: true))
+                            .foregroundStyle(Theme.text)
+                        Text("\(Store.monkDays) dias, \(Store.minHabits) hábitos ou mais, sem desculpa.")
+                            .font(.inter(14))
+                            .foregroundStyle(Theme.muted)
+                            .multilineTextAlignment(.leading)
+                    }
+                    Spacer(minLength: 0)
+                    Text("Iniciar")
+                        .font(.inter(15, .semibold))
+                        .foregroundStyle(Theme.accent)
+                    Image(systemName: "chevron.right")
+                        .foregroundStyle(Theme.accent)
+                }
+                .card(padding: 18, radius: 20)
+            }
+            .buttonStyle(.plain)
         }
     }
 

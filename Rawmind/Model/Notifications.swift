@@ -71,6 +71,25 @@ enum Notifications {
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: habitIDs(habit))
     }
 
+    /// Aviso do prazo do Monk Mode, um por dia que ainda falta. Lista vazia apaga todos.
+    static func scheduleMonkDeadlines(_ days: [(date: Date, day: Int)]) {
+        let center = UNUserNotificationCenter.current()
+        center.getPendingNotificationRequests { requests in
+            let old = requests.map(\.identifier).filter { $0.hasPrefix("rawmind.monk.") }
+            center.removePendingNotificationRequests(withIdentifiers: old)
+            for item in days {
+                let content = UNMutableNotificationContent()
+                content.title = "Monk Mode · dia \(item.day)"
+                content.body = "Ainda falta hábito pra marcar. O prazo é meia-noite."
+                content.sound = .default
+                let comps = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: item.date)
+                let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+                let id = "rawmind.monk.\(comps.year ?? 0)-\(comps.month ?? 0)-\(comps.day ?? 0)"
+                center.add(UNNotificationRequest(identifier: id, content: content, trigger: trigger))
+            }
+        }
+    }
+
     static func cancelAll() {
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
     }

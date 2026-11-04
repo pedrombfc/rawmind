@@ -1,142 +1,339 @@
 import SwiftUI
+import UIKit
 
-/// Aba Monk Mode: todos os hábitos dos 30 dias, cada um com a sua página.
+/// Aba Monk Mode: parado (botão de iniciar), ativo (hábitos de hoje até a meia-noite) ou completo.
 struct MonkModeView: View {
     @Environment(Store.self) private var store
-    @State private var showNew = false
+    @State private var showStart = false
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            SectionLabel(text: "Dia \(min(store.dayNumber, store.phaseTarget)) de \(store.phaseTarget)", color: Theme.accent)
-                            Text("Monk Mode")
-                                .font(.archivo(34))
-                                .tracking(-0.6)
-                        }
-                        Spacer()
-                        Button {
-                            showNew = true
-                        } label: {
-                            Image(systemName: "plus")
-                                .font(.system(size: 20, weight: .bold))
-                                .foregroundStyle(Theme.bg)
-                                .frame(width: 48, height: 48)
-                                .background(Circle().fill(store.canAddHabit ? Theme.accent : Theme.track))
-                        }
-                        .disabled(!store.canAddHabit)
-                        .accessibilityLabel("Novo hábito")
-                    }
-
-                    ThinBar(value: Double(min(store.dayNumber, store.phaseTarget)) / Double(store.phaseTarget))
-
-                    NavigationLink(value: MonkRoute.routine) {
-                        routineCard
-                    }
-                    .buttonStyle(.plain)
-
-                    if store.data.habits.isEmpty {
-                        emptyState
-                    } else {
-                        ForEach(store.data.habits) { habit in
-                            NavigationLink(value: MonkRoute.habit(habit.id)) {
-                                HabitCard(habit: habit)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-
-                    Text(store.canAddHabit
-                         ? "Poucos e firmes: até \(Store.maxHabits) hábitos além da rotina."
-                         : "Você chegou ao limite de \(Store.maxHabits) hábitos. Poucos e firmes funciona melhor.")
-                        .font(.inter(13))
-                        .foregroundStyle(Theme.muted)
-                        .padding(.top, 4)
+            Group {
+                if store.monkCompleted {
+                    MonkCompletedView { showStart = true }
+                } else if store.monkActive {
+                    MonkActiveView()
+                } else {
+                    MonkIntroView { showStart = true }
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
-                .padding(.bottom, 24)
             }
             .foregroundStyle(Theme.text)
             .screenBackground()
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: MonkRoute.self) { route in
                 switch route {
-                case .routine: RoutineView()
                 case .habit(let id): HabitDetailView(habitID: id)
                 }
             }
         }
-        .sheet(isPresented: $showNew) {
-            NavigationStack { HabitFormView(existing: nil) }
+        .fullScreenCover(isPresented: $showStart) {
+            MonkStartFlow()
         }
-    }
-
-    private var routineCard: some View {
-        HStack(spacing: 16) {
-            ProgressRing(value: store.data.routine.isEmpty ? 0 : Double(store.routineDoneCount) / Double(store.data.routine.count), color: Theme.done) {
-                Image(systemName: "sunrise")
-                    .font(.system(size: 20, weight: .semibold))
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Rotina matinal")
-                    .font(.archivo(19, bold: true))
-                Text("Obrigatória · \(store.routineDoneCount) de \(store.data.routine.count) hoje")
-                    .font(.inter(14))
-                    .foregroundStyle(Theme.muted)
-            }
-            Spacer(minLength: 0)
-            Image(systemName: "chevron.right").foregroundStyle(Theme.muted)
-        }
-        .card(padding: 16, radius: 24)
-    }
-
-    private var emptyState: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Nenhum hábito ainda")
-                .font(.archivo(19, bold: true))
-            Text("Escolha de 1 a \(Store.maxHabits) coisas para fazer (ou evitar) nos próximos 30 dias.")
-                .font(.inter(14))
-                .foregroundStyle(Theme.muted)
-            Button("Criar o primeiro") { showNew = true }
-                .buttonStyle(PrimaryButtonStyle())
-                .padding(.top, 8)
-        }
-        .card(padding: 18, radius: 24)
     }
 }
 
 enum MonkRoute: Hashable {
-    case routine
     case habit(UUID)
 }
 
-/// Cartão de um hábito na lista.
-struct HabitCard: View {
+// MARK: - Parado
+
+/// Antes de começar: as regras e o botão "Iniciar Monk Mode".
+private struct MonkIntroView: View {
+    @Environment(Store.self) private var store
+    let start: () -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                SectionLabel(text: "Desafio de \(Store.monkDays) dias", color: Theme.accent)
+                VStack(alignment: .leading, spacing: -8) {
+                    Text("Monk")
+                    Text("Mode")
+                }
+                .font(.archivo(56))
+                .tracking(-1.6)
+                Text("\(Store.monkDays) dias. No mínimo \(Store.minHabits) hábitos. Todos, todo dia. Sem desculpa.")
+                    .font(.inter(16))
+                    .foregroundStyle(Theme.muted)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                VStack(alignment: .leading, spacing: 16) {
+                    rule(1, "Escolha \(Store.minHabits) hábitos ou mais", "Fazer ou evitar. Eles ficam travados até o fim.")
+                    rule(2, "Marque todos até a meia-noite", "Faltou um? O Monk Mode acaba e volta pro dia 1.")
+                    rule(3, "1 segunda chance por mês", "Uma falha por mês você pode perdoar. Só uma.")
+                }
+                .card(padding: 20, radius: 24)
+
+                Text("A rotina matinal continua na tela Hoje, com ou sem Monk Mode.")
+                    .font(.inter(14))
+                    .foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 24)
+        }
+        .safeAreaInset(edge: .bottom) {
+            VStack(spacing: 12) {
+                Button(action: start) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 18, weight: .bold))
+                        Text("Iniciar Monk Mode")
+                    }
+                    .font(.archivo(20))
+                    .foregroundStyle(Theme.bg)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 60)
+                    .background(Theme.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                if store.monkRecord > 0 {
+                    Text("Melhor tentativa: \(store.monkRecord) \(store.monkRecord == 1 ? "dia" : "dias")")
+                        .font(.inter(14))
+                        .foregroundStyle(Theme.muted)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 10)
+            .padding(.bottom, 12)
+            .background(Theme.bg)
+        }
+    }
+
+    private func rule(_ n: Int, _ title: String, _ detail: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 14) {
+            Text("\(n)")
+                .font(.archivo(20))
+                .foregroundStyle(Theme.accent)
+                .frame(width: 18, alignment: .leading)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.inter(16, .semibold))
+                Text(detail)
+                    .font(.inter(14))
+                    .foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
+// MARK: - Ativo
+
+/// Monk Mode rodando: dia, prazo até a meia-noite e os hábitos de hoje.
+private struct MonkActiveView: View {
+    @Environment(Store.self) private var store
+
+    var body: some View {
+        let day = min(store.monkDay, Store.monkDays)
+        let habits = store.monkHabits
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        SectionLabel(text: "Monk Mode ativo", color: Theme.accent)
+                        (Text("Dia \(day)").foregroundColor(Theme.text)
+                         + Text(" de \(Store.monkDays)").font(.archivo(22)).foregroundColor(Theme.muted))
+                            .font(.archivo(44))
+                            .tracking(-0.8)
+                    }
+                    Spacer(minLength: 8)
+                    chancePill
+                        .padding(.top, 2)
+                }
+
+                ThinBar(value: Double(day) / Double(Store.monkDays))
+
+                TimelineView(.periodic(from: .now, by: 30)) { context in
+                    deadlineCard(now: context.date)
+                }
+
+                SectionLabel(text: "Hoje · \(store.monkDoneToday) de \(habits.count)")
+                    .padding(.top, 4)
+
+                ForEach(habits) { habit in
+                    MonkHabitRow(habit: habit)
+                }
+
+                Text("Toque num hábito para ver o calendário e as notas")
+                    .font(.inter(13))
+                    .foregroundStyle(Theme.muted)
+                    .frame(maxWidth: .infinity)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 2)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 24)
+        }
+    }
+
+    private var chancePill: some View {
+        let has = store.hasSecondChance()
+        return HStack(spacing: 6) {
+            Circle().fill(has ? Theme.done : Theme.muted).frame(width: 8, height: 8)
+            Text(has ? "1 segunda chance" : "Segunda chance usada")
+                .font(.inter(13, .medium))
+                .foregroundStyle(has ? Theme.text : Theme.muted)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Capsule().fill(Theme.card))
+    }
+
+    @ViewBuilder
+    private func deadlineCard(now: Date) -> some View {
+        let missing = store.monkHabits.count - store.monkDoneToday
+        if missing <= 0 {
+            HStack(spacing: 14) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 28))
+                    .foregroundStyle(Theme.done)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Tudo feito hoje")
+                        .font(.archivo(19, bold: true))
+                    Text("Amanhã é o dia \(min(store.monkDay + 1, Store.monkDays)).")
+                        .font(.inter(14))
+                        .foregroundStyle(Theme.muted)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.doneBg)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        } else {
+            let minutes = max(Int((store.midnight.timeIntervalSince(now) / 60).rounded(.up)), 0)
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(missing == 1 ? "Falta 1 hábito" : "Faltam \(missing) hábitos")
+                        .font(.archivo(19, bold: true))
+                    Text("Prazo: meia-noite")
+                        .font(.inter(14))
+                        .foregroundStyle(Theme.muted)
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 0) {
+                    Text(Store.durationText(minutes))
+                        .font(.archivo(28))
+                        .foregroundStyle(Theme.accent)
+                    Text("restantes")
+                        .font(.inter(13))
+                        .foregroundStyle(Theme.muted)
+                }
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(hex: 0x1F1A12))
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(Theme.accent, lineWidth: 1.5)
+            )
+        }
+    }
+}
+
+/// Uma linha de hábito: a caixinha marca, o resto abre a página do hábito.
+private struct MonkHabitRow: View {
     @Environment(Store.self) private var store
     let habit: Habit
 
     var body: some View {
-        let done = store.habitDoneDays(habit)
-        HStack(spacing: 16) {
-            ProgressRing(value: Double(done) / Double(habit.target), color: store.isHabitDone(habit) ? Theme.done : Theme.accent) {
-                Image(systemName: habit.icon)
-                    .font(.system(size: 20, weight: .semibold))
+        let done = store.isHabitDone(habit)
+        HStack(spacing: 4) {
+            Button {
+                withAnimation(.snappy) { store.toggleHabit(habit) }
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            } label: {
+                CheckBox(done: done, size: 26)
+                    .frame(width: 44, height: 44)
             }
-            VStack(alignment: .leading, spacing: 4) {
-                Text(habit.title)
-                    .font(.archivo(19, bold: true))
-                    .multilineTextAlignment(.leading)
-                Text(habit.avoid ? "\(done) \(done == 1 ? "dia limpo" : "dias limpo") · Evitar" : "\(done) de \(habit.target) · \(habit.frequencyText)")
-                    .font(.inter(14))
-                    .foregroundStyle(Theme.muted)
+            .buttonStyle(.plain)
+            .accessibilityLabel(done ? "Desmarcar \(habit.title)" : "Marcar \(habit.title)")
+
+            NavigationLink(value: MonkRoute.habit(habit.id)) {
+                HStack(spacing: 10) {
+                    Text(habit.title)
+                        .font(.inter(16, .medium))
+                        .foregroundStyle(done ? Theme.muted : Theme.text)
+                        .strikethrough(done, color: Theme.muted)
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: 0)
+                    Text(habit.sideText)
+                        .font(.inter(13))
+                        .foregroundStyle(Theme.muted)
+                }
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            Spacer(minLength: 0)
-            Image(systemName: "chevron.right").foregroundStyle(Theme.muted)
+            .buttonStyle(.plain)
         }
-        .card(padding: 16, radius: 24)
+        .padding(.leading, 6)
+        .padding(.trailing, 16)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.card)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+// MARK: - Completo
+
+/// Os 30 dias acabaram: hora de escrever a conclusão de cada hábito.
+private struct MonkCompletedView: View {
+    @Environment(Store.self) private var store
+    let startNew: () -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                SectionLabel(text: "Monk Mode completo", color: Theme.done)
+                (Text("\(Store.monkDays)").foregroundColor(Theme.text)
+                 + Text(" de \(Store.monkDays)").font(.archivo(22)).foregroundColor(Theme.muted))
+                    .font(.archivo(44))
+                ThinBar(value: 1, color: Theme.done)
+                Text("Você fez todos os hábitos, todos os dias. Agora escreva o que mudou em cada um.")
+                    .font(.inter(16))
+                    .foregroundStyle(Theme.muted)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                ForEach(store.monkHabits) { habit in
+                    NavigationLink(value: MonkRoute.habit(habit.id)) {
+                        HStack(spacing: 14) {
+                            Image(systemName: habit.icon)
+                                .font(.system(size: 18, weight: .semibold))
+                                .frame(width: 44, height: 44)
+                                .background(Circle().fill(Theme.track))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(habit.title)
+                                    .font(.inter(16, .semibold))
+                                    .multilineTextAlignment(.leading)
+                                Text(store.conclusion(for: habit).map { "Conclusão: \($0.decision.rawValue)" } ?? "Escrever conclusão")
+                                    .font(.inter(14))
+                                    .foregroundStyle(store.conclusion(for: habit) == nil ? Theme.accent : Theme.muted)
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right").foregroundStyle(Theme.muted)
+                        }
+                        .foregroundStyle(Theme.text)
+                        .card(padding: 14, radius: 20)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Button("Começar outro Monk Mode", action: startNew)
+                    .buttonStyle(PrimaryButtonStyle())
+                    .padding(.top, 8)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 24)
+        }
     }
 }
 

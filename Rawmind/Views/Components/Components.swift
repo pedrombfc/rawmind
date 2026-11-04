@@ -20,12 +20,13 @@ struct PrimaryButtonStyle: ButtonStyle {
 struct CheckBox: View {
     let done: Bool
     var size: CGFloat = 28
+    var color: Color = Theme.done
 
     var body: some View {
         ZStack {
             if done {
                 RoundedRectangle(cornerRadius: size * 0.32, style: .continuous)
-                    .fill(Theme.done)
+                    .fill(color)
                 Image(systemName: "checkmark")
                     .font(.system(size: size * 0.5, weight: .bold))
                     .foregroundStyle(Theme.bg)
